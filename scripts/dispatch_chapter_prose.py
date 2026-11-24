@@ -426,17 +426,45 @@ def setup_worktree(*, ch_num: int, slug: str) -> tuple[Path, str]:
     return worktree, branch
 
 
-def _prose_committed_on_branch(worktree: Path, prose_path: str) -> bool:
-    """True if the worktree's branch has at least one commit ahead of
-    main that touches ``prose_path``. Used to recover from agents that
-    finish their file-write + commit work but then fail their final
-    streaming response (Gemini's 429-on-summary pattern, observed on
-    Ch07 2026-04-28). The work landed; the runner just couldn't tell."""
+def _artifact_snapshot(worktree: Path, prose_path: str) -> tuple[str | None, bytes | None]:
+    """HEAD sha and chapter bytes before a phase runs (``None`` when unreadable)."""
     r = subprocess.run(
-        ["git", "log", "--oneline", "main..HEAD", "--", prose_path],
+        ["git", "rev-parse", "HEAD"],
         cwd=worktree, capture_output=True, text=True, check=False,
     )
-    return bool(r.stdout.strip())
+    head = r.stdout.strip() if r.returncode == 0 and r.stdout.strip() else None
+    try:
+        body = (worktree / prose_path).read_bytes()
+    except OSError:
+        body = None
+    return head, body
+
+
+def _prose_changed_since(worktree: Path, prose_path: str,
+                         before: tuple[str | None, bytes | None]) -> bool:
+    """True only if THIS phase changed the chapter artifact.
+
+    The lu-machinery runner reports a parsed provider success without
+    checking that a write-mode run wrote anything (the fork's guard for the
+    headless no-write flake, #2099, is gone). A success therefore counts
+    only when the chapter bytes differ from the phase-start snapshot or a
+    commit after the phase-start HEAD touches ``prose_path``. Comparing
+    against the phase start, not ``main``, keeps an earlier phase's commit
+    from passing for a later phase that did nothing. It also covers agents
+    that finish their write + commit but then fail their final streaming
+    response (Gemini's 429-on-summary pattern, observed on Ch07 2026-04-28).
+    """
+    head_before, body_before = before
+    _head_after, body_after = _artifact_snapshot(worktree, prose_path)
+    if body_after is not None and body_after != body_before:
+        return True
+    if head_before is None:
+        return False
+    r = subprocess.run(
+        ["git", "log", "--oneline", f"{head_before}..HEAD", "--", prose_path],
+        cwd=worktree, capture_output=True, text=True, check=False,
+    )
+    return r.returncode == 0 and bool(r.stdout.strip())
 
 
 def fire_phase(*, agent: str, prompt: str, worktree: Path, task_id: str,
@@ -473,6 +501,7 @@ def fire_phase(*, agent: str, prompt: str, worktree: Path, task_id: str,
         raise ValueError(agent)
 
     print(f"[fire] {agent} ({model}, mode={mode}) on {task_id}")
+    before = _artifact_snapshot(worktree, prose_path)
     try:
         r = invoke(
             agent, prompt,
@@ -495,10 +524,18 @@ def fire_phase(*, agent: str, prompt: str, worktree: Path, task_id: str,
         response = ""
         session_id = None
         stderr_excerpt = f"{type(exc).__name__}: {exc}"
-        if _prose_committed_on_branch(worktree, prose_path):
-            print(f"[fire] {agent} runner classified failure but commit "
-                  f"on {prose_path} is present — treating as success")
+        if _prose_changed_since(worktree, prose_path, before):
+            print(f"[fire] {agent} runner classified failure but this phase "
+                  f"changed {prose_path} — treating as success")
             ok = True
+    else:
+        if ok and not _prose_changed_since(worktree, prose_path, before):
+            ok = False
+            stderr_excerpt = (
+                f"{agent} reported success but {prose_path} is unchanged "
+                f"since the phase started (no write, no commit); retry"
+            )
+            print(f"[fire] {stderr_excerpt}", file=sys.stderr)
 
     log_path.write_text("\n".join([
         f"OK: {ok}",

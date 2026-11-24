@@ -161,8 +161,9 @@ def test_dispatch_omits_tool_config_when_not_requested(monkeypatch) -> None:
 
 
 def test_dispatch_tools_disabled_only_for_claude(monkeypatch) -> None:
-    """Codex keeps its read-only sandbox; AGY always asks for the bounded
-    reviewer route, which is the only route that admits read-only AGY."""
+    """Codex keeps its read-only sandbox; AGY passes no tool_config, so the
+    release provisions its bounded read-only route (a partial hand-built
+    config is refused there)."""
     captured: dict = {}
 
     def capture_invoke(agent, prompt, **kwargs):
@@ -174,4 +175,4 @@ def test_dispatch_tools_disabled_only_for_claude(monkeypatch) -> None:
     assert captured["kwargs"]["tool_config"] is None
     captured.clear()
     dispatchers.dispatch("gemini", "prompt", timeout=10, tools_disabled=True)
-    assert captured["kwargs"]["tool_config"] == {"reviewer_tools": True}
+    assert captured["kwargs"]["tool_config"] is None

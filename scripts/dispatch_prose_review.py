@@ -404,8 +404,8 @@ def fire(reviewer: str, *, prompt: str, slug: str) -> tuple[bool, str]:
             task_id=f"prose-review-{slug}-{reviewer}",
             entrypoint="consult",
             hard_timeout=timeout,
-            # AGY runs read-only only on its bounded reviewer route.
-            tool_config={"reviewer_tools": True} if reviewer == "agy" else None,
+            # No tool_config: the release provisions read-only AGY's bounded
+            # route itself; a partial hand-built config is refused.
         )
         return r.ok, (r.response or "")
     except (RateLimitedError, AgentTimeoutError) as e:

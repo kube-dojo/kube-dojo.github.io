@@ -112,8 +112,9 @@ def dispatch(
     dispatching a writer — Codex's file operations anchor to cwd.
 
     Every call runs in ``read-only`` mode. Codex enforces that with its
-    read-only sandbox; AGY runs read-only only on the runtime's bounded
-    reviewer route, so AGY calls request it. Claude's read-only mode still
+    read-only sandbox; AGY gets the release's bounded read-only route when
+    the call passes no ``tool_config`` (lu-machinery >= 0.1.64), and a
+    partial hand-built config is refused there. Claude's read-only mode still
     honours allow rules from checkout settings, so ``tools_disabled=True``
     (text-only writer/reviewer output) asks the runtime for its read-only
     tool set (``--tools Read,Grep,Glob,LS``): no edit, write or shell tool
@@ -131,9 +132,7 @@ def dispatch(
 
     runtime_agent = "agy" if agent == "gemini" else agent
     tool_config: dict[str, bool] | None = None
-    if runtime_agent == "agy":
-        tool_config = {"reviewer_tools": True}
-    elif runtime_agent == "claude" and tools_disabled:
+    if runtime_agent == "claude" and tools_disabled:
         tool_config = {"discussion_readonly": True}
 
     t0 = time.monotonic()

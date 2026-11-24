@@ -318,6 +318,27 @@ def orchestrator_open_pr(slug: str, module_path: str, codex_response: str) -> in
     return pr_num
 
 
+def published_head_matches(pr_num: int, wt: Path) -> tuple[bool, dict[str, str | None]]:
+    """True only when the writer's local commit is the PR head on GitHub.
+
+    The lu-machinery runner returns a danger-mode success without checking
+    that a new commit reached origin (the fork's push check is gone), and a
+    PR URL in the response skips the fallback branch probe. Review must see
+    the commit the writer made, so a stale or unpublished head stops here.
+    """
+    local = subprocess.run(
+        ["git", "rev-parse", "HEAD"], cwd=wt, capture_output=True, text=True, check=False,
+    )
+    remote = subprocess.run(
+        ["gh", "pr", "view", str(pr_num), "--json", "headRefOid", "--jq", ".headRefOid"],
+        cwd=wt, capture_output=True, text=True, check=False,
+    )
+    local_head = local.stdout.strip() if local.returncode == 0 else None
+    pr_head = remote.stdout.strip() if remote.returncode == 0 else None
+    detail = {"local_head": local_head, "pr_head": pr_head}
+    return bool(local_head) and local_head == pr_head, detail
+
+
 def cross_family_review_prompt(pr_num: int, module_path: str) -> str:
     return f"""Adversary cross-family review of PR #{pr_num} on KubeDojo.
 
@@ -672,6 +693,11 @@ def main(argv: list[str] | None = None) -> int:
             if pr_num is None:
                 log({"event": "module_skip", "module": module_path, "reason": "pr_creation_failed"})
                 continue
+        published, heads = published_head_matches(pr_num, wt)
+        if not published:
+            log({"event": "module_skip", "module": module_path, "pr": pr_num,
+                 "reason": "pr_head_not_published", **heads})
+            continue
         # Reviewer cascade. Primary defaults to claude; override via
         # KUBEDOJO_388_PRIMARY_REVIEWER (claude | agy | qwen | deepseek).
         # Cascade order is always primary → claude → qwen/deepseek fallback

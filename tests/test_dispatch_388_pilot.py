@@ -134,6 +134,7 @@ def test_main_approve_holds_merge_and_backfill_for_all_queued_items(tmp_path, ca
          patch.object(pilot.subprocess, "run", side_effect=AssertionError("unexpected subprocess")), \
          patch("scripts.quality.dispatch_388_pilot.make_worktree", return_value=tmp_path), \
          patch("scripts.quality.dispatch_388_pilot.dispatch_codex", return_value=codex_result), \
+         patch("scripts.quality.dispatch_388_pilot.published_head_matches", return_value=(True, {})), \
          patch("scripts.quality.dispatch_388_pilot.build_reviewer_cascade", return_value=[("claude", reviewer)]), \
          patch("scripts.quality.dispatch_388_pilot.dispatch_backfill", return_value=True) as mock_backfill, \
          patch("scripts.quality.dispatch_388_pilot.post_review_comment") as mock_post_review, \
@@ -191,6 +192,7 @@ def test_main_nonapprove_verdicts_remain_held(tmp_path, verdict, expected_event)
          patch.object(pilot.subprocess, "run", side_effect=AssertionError("unexpected subprocess")), \
          patch("scripts.quality.dispatch_388_pilot.make_worktree", return_value=tmp_path), \
          patch("scripts.quality.dispatch_388_pilot.dispatch_codex", return_value=codex_result), \
+         patch("scripts.quality.dispatch_388_pilot.published_head_matches", return_value=(True, {})), \
          patch("scripts.quality.dispatch_388_pilot.build_reviewer_cascade", return_value=[("claude", reviewer)]), \
          patch("scripts.quality.dispatch_388_pilot.dispatch_backfill") as mock_backfill, \
          patch("scripts.quality.dispatch_388_pilot.post_review_comment"), \
@@ -385,3 +387,33 @@ def test_dispatch_agy_review_invoke_exception_returns_error(
 
     assert text is None
     assert verdict == "ERROR"
+
+
+def test_main_skips_review_when_local_head_not_published(tmp_path):
+    """Defect class: the writer's local commit is not the published PR head
+    (stale or unpushed remote), yet the module advances to review."""
+    queue = tmp_path / "queue.txt"
+    queue.write_text("src/content/docs/k8s/cka/module-1.md")
+    codex_result = MagicMock(ok=True, response="Opened PR: https://github.com/org/repo/pull/42")
+    reviewer = MagicMock(return_value=("VERDICT: APPROVE", "APPROVE"))
+
+    def fake_run(cmd, **kwargs):
+        stdout = "local-sha\n" if cmd[:2] == ["git", "rev-parse"] else "stale-sha\n"
+        return _mock_run(0, stdout)
+
+    with patch.object(pilot, "invoke", side_effect=AssertionError("unexpected provider call")), \
+         patch.object(pilot.subprocess, "run", side_effect=fake_run), \
+         patch("scripts.quality.dispatch_388_pilot.make_worktree", return_value=tmp_path), \
+         patch("scripts.quality.dispatch_388_pilot.dispatch_codex", return_value=codex_result), \
+         patch("scripts.quality.dispatch_388_pilot.build_reviewer_cascade", return_value=[("claude", reviewer)]), \
+         patch("scripts.quality.dispatch_388_pilot.post_review_comment") as mock_post_review, \
+         patch("scripts.quality.dispatch_388_pilot.time.sleep"), \
+         patch("scripts.quality.dispatch_388_pilot.log") as mock_log:
+        assert pilot.main(["--input", str(queue)]) == 0
+
+    reviewer.assert_not_called()
+    mock_post_review.assert_not_called()
+    skipped = [c.args[0] for c in mock_log.call_args_list if c.args[0]["event"] == "module_skip"]
+    assert len(skipped) == 1
+    assert skipped[0]["reason"] == "pr_head_not_published"
+    assert (skipped[0]["local_head"], skipped[0]["pr_head"]) == ("local-sha", "stale-sha")

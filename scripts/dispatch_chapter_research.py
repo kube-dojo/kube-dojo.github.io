@@ -277,6 +277,7 @@ def fire_dispatch(*, worktree: Path, prompt: str, task_id: str,
     model = cfg["model"]
     timeout = int(cfg["hard_timeout"])  # type: ignore[arg-type]
     print(f"[dispatch] firing {agent} ({model}) on {task_id} ...")
+    head_before = _head_sha(worktree)
     result = invoke(
         agent,
         prompt,
@@ -299,7 +300,25 @@ def fire_dispatch(*, worktree: Path, prompt: str, task_id: str,
         f"stderr_excerpt: {result.stderr_excerpt or '(none)'}",
     ]))
     print(f"[dispatch] OK={result.ok}, log -> {log_path}")
-    return 0 if result.ok else 1
+    if not result.ok:
+        return 1
+    # The release runner returns a parsed success without checking that a
+    # write-mode run produced anything; the prompt's deliverable is a local
+    # commit, so a success with HEAD unmoved is a no-write run.
+    head_after = _head_sha(worktree)
+    if head_before is None or head_after is None or head_after == head_before:
+        print(f"[dispatch] {agent} reported success but made no commit "
+              f"(HEAD {head_before} -> {head_after}); treating as failure")
+        return 1
+    return 0
+
+
+def _head_sha(worktree: Path) -> str | None:
+    r = subprocess.run(
+        ["git", "rev-parse", "HEAD"],
+        cwd=worktree, capture_output=True, text=True, check=False,
+    )
+    return r.stdout.strip() if r.returncode == 0 and r.stdout.strip() else None
 
 
 def main() -> int:
