@@ -8,7 +8,9 @@ on:
       - '.github/workflows/**'
       - '.github/actions/**'
       - '.github/dependabot.yml'
-      - '.github/requirements/**'
+      - '.python-version'
+      - 'pyproject.toml'
+      - 'uv.lock'
   push:
     branches:
       - main
@@ -16,7 +18,9 @@ on:
       - '.github/workflows/**'
       - '.github/actions/**'
       - '.github/dependabot.yml'
-      - '.github/requirements/**'
+      - '.python-version'
+      - 'pyproject.toml'
+      - 'uv.lock'
 
 permissions:
   contents: read
@@ -34,14 +38,33 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0  # v7.1.0
         with:
-          python-version: "3.12"
+          python-version-file: .python-version
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7  # v10.2.0
+        with:
+          # The SHA-256 of the x86_64 Linux archive makes an unverifiable
+          # download fail instead of being installed unchecked (setup-uv skips
+          # versions it has no checksum for). Change both together, in every
+          # workflow that sets up uv.
+          version: "0.13.9"
+          checksum: "a7fbaff2b9a271d85c1bdb540941090fd1ce011797b4abeb48e4dcd39c2471d5"
+          enable-cache: false
 
       - name: Install zizmor
+        # The zizmor dependency group in pyproject.toml, exported from uv.lock and
+        # installed with --require-hashes (uv sync would trust index metadata for
+        # a lock entry without a digest).
+        env:
+          UV_PYTHON_DOWNLOADS: never
         run: |
-          python -m pip install --require-hashes --only-binary=:all: \
-            -r .github/requirements/requirements-zizmor.txt
+          uv export --locked --only-group zizmor --no-emit-project --format requirements.txt \
+            --output-file "$RUNNER_TEMP/zizmor-requirements.txt"
+          uv venv --python "$(cat .python-version)" .venv
+          uv pip sync --python .venv/bin/python --require-hashes --no-build \
+            "$RUNNER_TEMP/zizmor-requirements.txt"
 
       - name: Run zizmor
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: zizmor --persona=regular --strict-collection .github/
+        run: .venv/bin/zizmor --persona=regular --strict-collection .github/

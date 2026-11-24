@@ -26,7 +26,7 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0  # v7.1.0
         with:
-          python-version: "3.14"
+          python-version-file: .python-version
 
       # incident_dedup_gate.py, check_incident_reuse.py, and audit_incident_reuse.py
       # use only the Python standard library; no pip install is needed.

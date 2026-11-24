@@ -27,21 +27,70 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0  # v7.1.0
         with:
-          python-version: "3.12"
+          python-version-file: .python-version
 
-      - name: Install PyYAML
+      - name: Set up uv
+        uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7  # v10.2.0
+        with:
+          # The SHA-256 of the x86_64 Linux archive makes an unverifiable
+          # download fail instead of being installed unchecked (setup-uv skips
+          # versions it has no checksum for). Change both together, in every
+          # workflow that sets up uv.
+          version: "0.13.9"
+          checksum: "a7fbaff2b9a271d85c1bdb540941090fd1ce011797b4abeb48e4dcd39c2471d5"
+          enable-cache: false
+
+      - name: Check every locked artifact has a hash
+        # uv lock --check and uv sync accept a uv.lock entry with no digest, and
+        # an install verifies only the artifacts of its own platform. This
+        # always-on check keeps every wheel and sdist on main hash-pinned, for
+        # every platform's `uv sync --locked`.
+        run: |
+          python -I - <<'PY'
+          import sys, tomllib
+          with open("uv.lock", "rb") as f:
+              lock = tomllib.load(f)
+          missing = []
+          for pkg in lock.get("package", []):
+              # Registry and direct-URL artifacts carry digests; git, path and
+              # virtual sources are pinned by commit or by this checkout.
+              if not {"registry", "url"} & pkg.get("source", {}).keys():
+                  continue
+              artifacts = pkg.get("wheels", []) + ([pkg["sdist"]] if "sdist" in pkg else [])
+              if not artifacts:
+                  missing.append(f'{pkg["name"]} {pkg["version"]}: no artifacts')
+              for art in artifacts:
+                  if not str(art.get("hash", "")).startswith("sha256:"):
+                      missing.append(f'{pkg["name"]} {pkg["version"]}: {art.get("url", "?")}')
+          if missing:
+              print("uv.lock artifacts without a sha256 digest:", *missing, sep="\n  ", file=sys.stderr)
+              sys.exit(1)
+          print(f"uv.lock: every registry and URL artifact has a sha256 digest ({len(lock['package'])} packages)")
+          PY
+
+      - name: Install the locked runtime dependencies
         # check_site_health.py is stdlib-only, but the lab.url validator parses
         # frontmatter with a real YAML loader (robust against flow-style /
         # inline-comment edge cases — see codex R1 on PR #1790).
+        # `uv sync` trusts index metadata for a lock entry without a digest, so
+        # install from the exported lock with --require-hashes instead. Exporting
+        # every group makes this always-on job refuse a uv.lock in which any
+        # artifact lacks a hash. --locked refuses a stale lock; --no-build refuses
+        # source builds.
+        env:
+          UV_PYTHON_DOWNLOADS: never
         run: |
-          python -m pip install --require-hashes --only-binary=:all: \
-            -r .github/requirements/requirements-link-check.txt
+          uv export --locked --all-groups --no-emit-project --format requirements.txt \
+            --output-file "$RUNNER_TEMP/locked-requirements.txt"
+          uv venv --python "$(cat .python-version)" .venv
+          uv pip sync --python .venv/bin/python --require-hashes --no-build \
+            "$RUNNER_TEMP/locked-requirements.txt"
 
       - name: Run site health check
-        run: python scripts/check_site_health.py
+        run: .venv/bin/python scripts/check_site_health.py
 
       - name: Check lab URL convention
-        run: python scripts/ci/check_lab_urls.py
+        run: .venv/bin/python scripts/ci/check_lab_urls.py
 
       - name: Check Mermaid flowchart labels
         # Mermaid renders client-side, so neither the astro build nor the
@@ -49,7 +98,7 @@ jobs:
         # flowchart [..]/{..} node label aborts the whole diagram (it renders
         # as raw code in the browser). This stdlib-only lint closes that gap
         # deterministically. Author fix: `python scripts/ci/check_mermaid_labels.py --fix`.
-        run: python scripts/ci/check_mermaid_labels.py
+        run: .venv/bin/python scripts/ci/check_mermaid_labels.py
 
       - name: Check route coherence
         # site-health checks that links RESOLVE; this checks the relationships
@@ -59,4 +108,4 @@ jobs:
         # existing inventory drains as the curriculum lane fixes it. Warnings
         # (skip / terminus-orphan / count-drift) report but do not fail. stdlib-only.
         # Refresh the baseline: python scripts/quality/check_route_coherence.py --update-baseline
-        run: python scripts/quality/check_route_coherence.py
+        run: .venv/bin/python scripts/quality/check_route_coherence.py
