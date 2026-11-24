@@ -27,14 +27,12 @@ Live roster, caps and routes are read fresh from the catalog and the
 resolver, never from this file.
 
 **Curriculum edits by Claude workers.** The KubeDojo content hook
-`block-orchestrator-content-edits.sh` refuses Claude `Edit`/`Write` on
-`src/content/docs/**` unless `KUBEDOJO_DISPATCHED=1`, and today only the legacy
-`scripts/dispatch_smart.py` sets it; a Claude worker started by
-`lu_machinery.dispatch` is refused. This is a known gap: this overlay has no
-runnable command for a Claude curriculum edit, and census PR 7 owns migrating
-the exemption. Until then, send curriculum edits to a non-Claude implementer
-through the installed `drive-epic` routing, taking the model and account from
-the resolver.
+`block-orchestrator-content-edits.sh` blocks direct undispatched orchestrator
+`Edit`/`Write` calls on `src/content/docs/**` and allows workers started by
+`lu_machinery.dispatch` (recognised via non-empty
+`LEARN_UKRAINIAN_DISPATCH_TASK_ID`, set in `lu_machinery/dispatcher/environment.py`).
+Route curriculum edits through the installed `drive-epic` dispatcher, taking
+the model and account from the resolver.
 
 KubeDojo delivery and review notes: [delivery.md](delivery.md). Sister-repo details: [dual-repo.md](dual-repo.md).
 

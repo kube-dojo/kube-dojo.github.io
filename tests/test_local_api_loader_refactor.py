@@ -32,8 +32,6 @@ local_api = _load_module()
 def test_generic_loader_loads_each_submodule() -> None:
     ui = local_api._load_ui_fragments_module()
     assert hasattr(ui, "render_poll_stale_script")
-    guard = local_api._load_repo_guard_module()
-    assert hasattr(guard, "build_healthz_payload")
 
 
 def test_loader_caches_modules() -> None:

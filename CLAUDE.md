@@ -29,9 +29,9 @@ dispatcher refuses.
 - `GET /api/module/{key}/state`
 - `GET /api/reviews?module={key}`
 
-Optional situational check: `GET /api/activity?limit=30`. Start the local API with
-`scripts/services-up --api-only` (loopback bind, primary-checkout root) when it is
-down; an unreachable API is unknown state.
+Optional situational check: `GET /api/content/coverage` or `GET /api/tracks/readiness`.
+Start the local API with `./services.sh start api` (primary checkout) or
+`.venv/bin/python scripts/local_api.py` when it is down; an unreachable API is unknown state.
 
 ## Agent Usage
 
@@ -66,10 +66,10 @@ never a review of record. Pending decisions are recorded in
 
 ## Session Workflow
 
-1. **Orient via `/api/briefing/session`** (see *Agent Orientation* above). `STATUS.md` is the fallback when the API is down.
+1. **Orient via the installed release** (see *Agent Orientation* above). `STATUS.md` is the fallback when the API is down.
 2. Use `scripts/prompts/module-writer.md` for new modules
 3. Send completed work through the installed `review-loop` skill (independent, cross-family, exact-head; see also `docs/review-protocol.md`) before closing issues
-4. **At session end**: write a lean handoff BRIEF (~2-5KB, YAML frontmatter + bullets) to `.agent/session-state/YYYY-MM-DD-session-NN-<topic>.md` — **Markdown, in the agent dir, never through git/PRs** (AI→AI local agent state; user directives s190b + s196, lu parity #3768/#4704). `docs/session-state/` = tracked pre-s196 history. Then update the LIVE index **`.agent/STATUS.md`** (machine-local, gitignored; preferred by the briefing API — seed from the tracked `STATUS.md` if missing) — promote the new file to "Latest handoff", shift the previous Latest into "Predecessor chain", refresh "Cross-thread notes" / `## TODO` / `## Blockers`. The tracked `STATUS.md` holds durable sections and changes via PR only. **Do NOT inline the full handoff into STATUS.md** — it is an index, not a log. The briefing API (`scripts/local_api.py:_parse_status_md`) parses `## TODO` (unchecked `- [ ]`) and `## Blockers` (`- `) from STATUS.md, so keep those headings populated.
+4. **At session end**: follow the installed `thread-rollover` skill and lane `handoff_note` (rules core P7). Keep the tracked `STATUS.md` for durable sections updated via PR only.
 
 ## Build & Serve
 
