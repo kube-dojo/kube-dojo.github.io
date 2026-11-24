@@ -435,33 +435,33 @@ def _git_head(worktree: Path) -> str | None:
 
 
 def _prose_committed_since(worktree: Path, prose_path: str, head_before: str | None) -> bool:
-    """True only if THIS phase committed the chapter and left none of it uncommitted.
+    """True only if THIS phase left a net committed change to the chapter.
 
     Every phase's deliverable is a local commit of ``prose_path`` (the
     prompts say so, and the branch is pushed afterwards). The lu-machinery
     runner reports a parsed provider success without checking that a
     write-mode run produced anything (the fork's guard for the headless
-    no-write flake, #2099, is gone), so success needs a commit after the
-    phase-start HEAD that touches the chapter, and no uncommitted chapter
-    bytes a push would leave behind. Comparing against the phase start, not
-    ``main``, keeps an earlier phase's commit from passing for a later phase
-    that did nothing. The same check recovers agents that finish their
-    write + commit but then fail their final streaming response (Gemini's
-    429-on-summary pattern, observed on Ch07 2026-04-28).
+    no-write flake, #2099, is gone), so success needs the chapter at HEAD to
+    differ from the chapter at the phase-start HEAD (a commit followed by
+    its reversal is no change), the chapter to exist at HEAD, and no
+    uncommitted chapter bytes a push would leave behind. Comparing against
+    the phase start, not ``main``, keeps an earlier phase's commit from
+    passing for a later phase that did nothing. The same check recovers
+    agents that finish their write + commit but then fail their final
+    streaming response (Gemini's 429-on-summary pattern, Ch07 2026-04-28).
     """
     if head_before is None:
         return False
-    log = subprocess.run(
-        ["git", "log", "--format=%H", f"{head_before}..HEAD", "--", prose_path],
-        cwd=worktree, capture_output=True, text=True, check=False,
+    checks = (
+        (["git", "diff", "--name-only", head_before, "HEAD", "--", prose_path], True),
+        (["git", "ls-tree", "-r", "--name-only", "HEAD", "--", prose_path], True),
+        (["git", "status", "--porcelain", "--", prose_path], False),
     )
-    if log.returncode != 0 or not log.stdout.strip():
-        return False
-    status = subprocess.run(
-        ["git", "status", "--porcelain", "--", prose_path],
-        cwd=worktree, capture_output=True, text=True, check=False,
-    )
-    return status.returncode == 0 and not status.stdout.strip()
+    for argv, want_output in checks:
+        r = subprocess.run(argv, cwd=worktree, capture_output=True, text=True, check=False)
+        if r.returncode != 0 or bool(r.stdout.strip()) is not want_output:
+            return False
+    return True
 
 
 def fire_phase(*, agent: str, prompt: str, worktree: Path, task_id: str,

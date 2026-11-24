@@ -160,12 +160,14 @@ def _git(cwd, *args):
                    cwd=cwd, check=True, capture_output=True)
 
 
-@pytest.mark.parametrize(("writer", "success"), [("idle", False), ("uncommitted", False), ("committed", True)])
+@pytest.mark.parametrize(("writer", "success"), [
+    ("idle", False), ("uncommitted", False), ("reverted", False), ("committed", True),
+])
 def test_phase_success_without_artifact_change_fails(isolated, monkeypatch, tmp_path, capsys, writer, success):
-    """Defect class: a writer reports success but this phase left no clean
-    commit of the chapter (no write at all, or bytes written but never
-    committed, which the later push would leave behind), so the pipeline
-    must not advance on it."""
+    """Defect class: a writer reports success but this phase left no net,
+    clean commit of the chapter (no write at all; bytes written but never
+    committed, which the later push would leave behind; or a commit followed
+    by its reversal), so the pipeline must not advance on it."""
     arguments(monkeypatch, phases="agy")
     path = isolated["path"]
     path.parent.mkdir(parents=True)
@@ -177,8 +179,11 @@ def test_phase_success_without_artifact_change_fails(isolated, monkeypatch, tmp_
     def provider(*args, **kwargs):
         if writer != "idle":
             path.write_text("one two", encoding="utf-8")
-        if writer == "committed":
+        if writer in ("committed", "reverted"):
             _git(tmp_path, "commit", "-q", "-am", "draft")
+        if writer == "reverted":
+            path.write_text("stub", encoding="utf-8")
+            _git(tmp_path, "commit", "-q", "-am", "revert draft")
         return MagicMock(ok=True, response="done", session_id=None, stderr_excerpt="")
 
     isolated["runner"].invoke.side_effect = provider

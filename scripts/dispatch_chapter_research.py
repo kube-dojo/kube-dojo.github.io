@@ -304,23 +304,30 @@ def fire_dispatch(*, worktree: Path, prompt: str, task_id: str,
         return 1
     # The release runner returns a parsed success without checking that a
     # write-mode run produced anything. The prompt's deliverable is a local
-    # commit of the chapter's contract directory, so success needs a commit
-    # after the pre-dispatch HEAD that touches that directory.
+    # commit of the chapter's contract directory, so success needs a net
+    # committed change there since the pre-dispatch HEAD.
     if not _committed_since(worktree, head_before, artifact_dir):
-        print(f"[dispatch] {agent} reported success but made no commit touching "
-              f"{artifact_dir} since HEAD {head_before}; treating as failure")
+        print(f"[dispatch] {agent} reported success but left no net committed "
+              f"change under {artifact_dir} since HEAD {head_before}; treating as failure")
         return 1
     return 0
 
 
 def _committed_since(worktree: Path, head_before: str | None, path: str) -> bool:
+    """A net committed change under ``path`` since ``head_before`` that is present at HEAD.
+
+    A commit followed by its reversal is no change.
+    """
     if head_before is None:
         return False
-    r = subprocess.run(
-        ["git", "log", "--format=%H", f"{head_before}..HEAD", "--", path],
-        cwd=worktree, capture_output=True, text=True, check=False,
-    )
-    return r.returncode == 0 and bool(r.stdout.strip())
+    for argv in (
+        ["git", "diff", "--name-only", head_before, "HEAD", "--", path],
+        ["git", "ls-tree", "-r", "--name-only", "HEAD", "--", path],
+    ):
+        r = subprocess.run(argv, cwd=worktree, capture_output=True, text=True, check=False)
+        if r.returncode != 0 or not r.stdout.strip():
+            return False
+    return True
 
 
 def _head_sha(worktree: Path) -> str | None:

@@ -326,43 +326,45 @@ def git_head(wt: Path) -> str | None:
 
 
 def writer_committed_module(wt: Path, module_path: str, head_before: str | None) -> tuple[bool, dict[str, str | None]]:
-    """True only when THIS writer run committed a change to ``module_path``.
+    """True only when THIS writer run left a net committed change to ``module_path``.
 
     The lu-machinery runner returns a danger-mode success without checking
     that the run produced anything, and the pilot reuses module worktrees,
     so an idle writer could otherwise hand back an older commit (or an
-    existing PR URL) as its own. Success needs a commit after the
-    pre-dispatch HEAD that touches the module.
+    existing PR URL) as its own. Success needs the module at HEAD to differ
+    from the module at the pre-dispatch HEAD (a commit followed by its
+    reversal is no change) and the module to exist at HEAD. ``local_head``
+    in the detail is the head that was checked; review must see exactly it.
     """
     local_head = git_head(wt)
     detail: dict[str, str | None] = {"head_before": head_before, "local_head": local_head}
     if head_before is None or local_head is None or local_head == head_before:
         return False, {**detail, "reason": "no_new_commit"}
-    log = subprocess.run(
-        ["git", "log", "--format=%H", f"{head_before}..HEAD", "--", module_path],
-        cwd=wt, capture_output=True, text=True, check=False,
-    )
-    if log.returncode != 0 or not log.stdout.strip():
-        return False, {**detail, "reason": "commit_misses_module"}
+    for argv in (
+        ["git", "diff", "--name-only", head_before, local_head, "--", module_path],
+        ["git", "ls-tree", "-r", "--name-only", local_head, "--", module_path],
+    ):
+        r = subprocess.run(argv, cwd=wt, capture_output=True, text=True, check=False)
+        if r.returncode != 0 or not r.stdout.strip():
+            return False, {**detail, "reason": "no_net_module_change"}
     return True, detail
 
 
-def published_head_matches(pr_num: int, wt: Path) -> tuple[bool, dict[str, str | None]]:
-    """True only when the writer's local commit is the PR head on GitHub.
+def published_head_matches(pr_num: int, wt: Path, checked_head: str | None) -> tuple[bool, dict[str, str | None]]:
+    """True only when the PR head on GitHub is the head whose module change was checked.
 
     The release runner does not check that a new commit reached origin (the
     fork's push check is gone), and a PR URL in the response skips the
     fallback branch probe. Review must see the commit the writer made, so a
     stale or unpublished head stops here.
     """
-    local_head = git_head(wt)
     remote = subprocess.run(
         ["gh", "pr", "view", str(pr_num), "--json", "headRefOid", "--jq", ".headRefOid"],
         cwd=wt, capture_output=True, text=True, check=False,
     )
     pr_head = remote.stdout.strip() if remote.returncode == 0 else None
-    detail = {"local_head": local_head, "pr_head": pr_head, "reason": "pr_head_not_published"}
-    return bool(local_head) and local_head == pr_head, detail
+    detail = {"local_head": checked_head, "pr_head": pr_head, "reason": "pr_head_not_published"}
+    return bool(checked_head) and checked_head == pr_head, detail
 
 
 def cross_family_review_prompt(pr_num: int, module_path: str) -> str:
@@ -724,7 +726,7 @@ def main(argv: list[str] | None = None) -> int:
             if pr_num is None:
                 log({"event": "module_skip", "module": module_path, "reason": "pr_creation_failed"})
                 continue
-        published, heads = published_head_matches(pr_num, wt)
+        published, heads = published_head_matches(pr_num, wt, commit_detail.get("local_head"))
         if not published:
             log({"event": "module_skip", "module": module_path, "pr": pr_num, **heads})
             continue
