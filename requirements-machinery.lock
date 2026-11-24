@@ -1,5 +1,5 @@
-lu-machinery==0.1.63 \
-    --hash=sha256:7952b95958084c8e4188081e6ba9562e39a93bfa00b20267c534f4120f66049d
+lu-machinery==0.1.65 \
+    --hash=sha256:624e9b413b8c5d021693263deceba92fe08f222e7ab514540d5c59e61a9164f2
 annotated-doc==0.0.5 \
     --hash=sha256:117bac03a25ede5df5440e855b32d556049ca169ead221505badf432fed4b101
 annotated-types==0.8.0 \
