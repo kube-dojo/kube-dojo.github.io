@@ -41,22 +41,31 @@ class Snapshot:
 GIT_TIMEOUT_S = 120
 
 
-def _git(worktree: Path, *args: str, stdin: str | None = None) -> subprocess.CompletedProcess[str]:
+def _git(worktree: Path, *args: str, stdin: bytes | None = None) -> subprocess.CompletedProcess[bytes]:
+    """Run git with raw bytes in and out (paths may be any bytes); bounded."""
     argv = ["git", *args]
     try:
         return subprocess.run(
-            argv, cwd=worktree, input=stdin, capture_output=True, text=True, check=False,
-            timeout=GIT_TIMEOUT_S,
+            argv, cwd=worktree, input=stdin, capture_output=True, check=False, timeout=GIT_TIMEOUT_S,
         )
     except subprocess.TimeoutExpired:
-        return subprocess.CompletedProcess(argv, 124, "", f"git timed out after {GIT_TIMEOUT_S}s")
+        return subprocess.CompletedProcess(argv, 124, b"", b"git timed out")
+
+
+def _ids(raw: bytes) -> list[str]:
+    """Object ids from git output (hex only)."""
+    return raw.decode("ascii", "replace").split()
+
+
+def _exclusions(shas: list[str]) -> bytes:
+    return "".join(f"^{s}\n" for s in shas).encode("ascii")
 
 
 def rev(worktree: Path, ref: str) -> str | None:
     """The commit ``ref`` names, or ``None``."""
     r = _git(worktree, "rev-parse", "--verify", "--quiet", f"{ref}^{{commit}}")
-    out = r.stdout.strip()
-    return out if r.returncode == 0 and out else None
+    ids = _ids(r.stdout) if r.returncode == 0 else []
+    return ids[0] if len(ids) == 1 else None
 
 
 def snapshot(worktree: Path, ref: str = "HEAD", prior_outputs: tuple[str | None, ...] = ()) -> Snapshot:
@@ -70,25 +79,26 @@ def snapshot(worktree: Path, ref: str = "HEAD", prior_outputs: tuple[str | None,
     r = _git(worktree, "rev-list", "--all", "--reflog", "--no-walk")
     if start is None or r.returncode != 0:
         return Snapshot(None, ())
-    tips = {start, *r.stdout.split(), *(s for s in prior_outputs if s)}
+    tips = {start, *_ids(r.stdout), *(s for s in prior_outputs if s)}
     return Snapshot(start, tuple(sorted(tips)))
 
 
-def _content(worktree: Path, commit: str, artifact: str) -> frozenset[tuple[str, str]] | None:
-    """The artifact's committed content at ``commit``: ``(path, blob id)`` pairs.
+def _content(worktree: Path, commit: str, artifact: str) -> frozenset[tuple[bytes, bytes]] | None:
+    """The artifact's committed content at ``commit``: ``(raw path, blob id)`` pairs.
 
     A file artifact yields one pair, a directory one pair per file below it.
-    File modes are ignored, so an executable-bit change is not new content.
+    Paths stay raw bytes (any filename git can store, compared exactly); file
+    modes are ignored, so an executable-bit change is not new content.
     ``None`` means git failed.
     """
     r = _git(worktree, "ls-tree", "-r", "-z", commit, "--", artifact)
     if r.returncode != 0:
         return None
     pairs = set()
-    for entry in r.stdout.split("\0"):
-        meta, _, path = entry.partition("\t")
+    for entry in r.stdout.split(b"\0"):
+        meta, _, path = entry.partition(b"\t")
         fields = meta.split()
-        if len(fields) == 3 and fields[1] == "blob":
+        if len(fields) == 3 and fields[1] == b"blob":
             pairs.add((path, fields[2]))
     return frozenset(pairs)
 
@@ -96,10 +106,16 @@ def _content(worktree: Path, commit: str, artifact: str) -> frozenset[tuple[str,
 def _known_commits(worktree: Path, shas: tuple[str, ...]) -> list[str]:
     if not shas:
         return []
-    r = _git(worktree, "cat-file", "--batch-check=%(objectname) %(objecttype)", stdin="".join(f"{s}\n" for s in shas))
+    r = _git(worktree, "cat-file", "--batch-check=%(objectname) %(objecttype)",
+             stdin="".join(f"{s}\n" for s in shas).encode("ascii"))
     if r.returncode != 0:
         return []
-    return [line.split()[0] for line in r.stdout.splitlines() if line.endswith(" commit")]
+    known = []
+    for line in r.stdout.decode("ascii", "replace").splitlines():
+        fields = line.split()
+        if len(fields) == 2 and fields[1] == "commit":
+            known.append(fields[0])
+    return known
 
 
 def produced(worktree: Path, before: Snapshot, artifact: str, ref: str = "HEAD") -> tuple[str | None, str | None]:
@@ -117,14 +133,12 @@ def produced(worktree: Path, before: Snapshot, artifact: str, ref: str = "HEAD")
     excluded = _known_commits(worktree, before.prior_tips)
     if before.start not in excluded:
         return final, "git_error"
-    fresh = _git(worktree, "rev-list", "--stdin", final, "--", artifact,
-                 stdin="".join(f"^{s}\n" for s in excluded))
+    fresh = _git(worktree, "rev-list", "--stdin", final, "--", artifact, stdin=_exclusions(excluded))
     if fresh.returncode != 0:
         return final, "git_error"
     if not fresh.stdout.strip():
         return final, "no_new_artifact_commit"
-    boundary = _git(worktree, "rev-list", "--boundary", "--stdin", final,
-                    stdin="".join(f"^{s}\n" for s in excluded))
+    boundary = _git(worktree, "rev-list", "--boundary", "--stdin", final, stdin=_exclusions(excluded))
     if boundary.returncode != 0:
         return final, "git_error"
     final_content = _content(worktree, final, artifact)
@@ -132,7 +146,7 @@ def produced(worktree: Path, before: Snapshot, artifact: str, ref: str = "HEAD")
         return final, "git_error"
     if not final_content:
         return final, "artifact_missing"
-    bases = {before.start} | {line[1:] for line in boundary.stdout.split() if line.startswith("-")}
+    bases = {before.start} | {line[1:] for line in _ids(boundary.stdout) if line.startswith("-")}
     for base in sorted(bases):
         base_content = _content(worktree, base, artifact)
         if base_content is None:

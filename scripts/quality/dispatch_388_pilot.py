@@ -98,12 +98,22 @@ def repo_relative_module(module_path: str) -> str | None:
     prompt, the commit check in the module worktree, source acceptance) uses
     the one repository-relative form; anything else is refused.
     """
+    if "\0" in module_path:
+        return None
+    try:
+        module_path.encode("utf-8")  # a lone surrogate names no portable file
+    except UnicodeEncodeError:
+        return None
     path = Path(module_path)
     if ".." in path.parts:
         return None
     if path.is_absolute():
-        resolved = path.resolve()  # a symlinked spelling of either checkout
-        for root in (REPO.resolve(), PRIMARY_REPO.resolve()):  # this checkout first: it is nested in the primary
+        try:
+            resolved = path.resolve()  # a symlinked spelling of either checkout
+            roots = (REPO.resolve(), PRIMARY_REPO.resolve())  # this checkout first: it is nested in the primary
+        except (OSError, RuntimeError, ValueError):  # e.g. a symlink loop (RuntimeError before Python 3.13)
+            return None
+        for root in roots:
             if resolved.is_relative_to(root):
                 path = resolved.relative_to(root)
                 break
@@ -361,7 +371,8 @@ def _published_branch_head(slug: str) -> tuple[bool, str | None]:
     try:
         ls = subprocess.run(
             ["git", "ls-remote", "--exit-code", "origin", f"refs/heads/codex/388-pilot-{slug}"],
-            cwd=REPO, capture_output=True, text=True, check=False, timeout=REMOTE_TIMEOUT_S,
+            cwd=REPO, capture_output=True, text=True, errors="replace", check=False,
+            timeout=REMOTE_TIMEOUT_S,
         )
     except subprocess.TimeoutExpired:
         return False, None
@@ -413,7 +424,8 @@ def published_head_matches(pr_num: int, wt: Path, checked_head: str | None) -> t
     try:
         remote = subprocess.run(
             ["gh", "pr", "view", str(pr_num), "--json", "headRefOid", "--jq", ".headRefOid"],
-            cwd=wt, capture_output=True, text=True, check=False, timeout=REMOTE_TIMEOUT_S,
+            cwd=wt, capture_output=True, text=True, errors="replace", check=False,
+            timeout=REMOTE_TIMEOUT_S,
         )
         pr_head = remote.stdout.strip() if remote.returncode == 0 else None
     except subprocess.TimeoutExpired:

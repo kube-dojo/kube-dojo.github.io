@@ -455,7 +455,8 @@ def _prose_committed_since(worktree: Path, prose_path: str, branch: str,
     try:
         status = subprocess.run(
             ["git", "status", "--porcelain", "--", prose_path],
-            cwd=worktree, capture_output=True, text=True, check=False, timeout=GIT_TIMEOUT_S,
+            cwd=worktree, capture_output=True, text=True, errors="replace", check=False,
+            timeout=GIT_TIMEOUT_S,
         )
     except subprocess.TimeoutExpired:
         status = subprocess.CompletedProcess([], 124, "", "")
