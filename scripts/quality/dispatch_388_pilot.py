@@ -565,7 +565,7 @@ def dispatch_agy_review(pr_num: int, module_path: str, slug: str):
 
     Agy is the Google lane (it replaced the retired gemini-cli per #1350/#2125)
     for the Google One / unpaid tier. Run-time:
-    - mode=danger required (dispatch_smart enforces this for agy)
+    - mode=danger required for agy in the shared agent_runtime
     - no `model=` arg — agy picks model via its TUI panel (env override:
       KUBEDOJO_AGY_MODEL; else the lu-machinery release's default AGY model)
 

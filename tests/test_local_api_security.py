@@ -171,34 +171,6 @@ def test_post_response_headers_do_not_split_on_crlf(monkeypatch, tmp_path: Path)
     _with_server(tmp_path, request)
 
 
-def test_strip_html_noncontent_handles_script_with_trailing_space() -> None:
-    assert "<x>" not in local_api._strip_html_noncontent("<script>x</script >")
-
-
-def test_strip_html_noncontent_handles_style_with_trailing_space() -> None:
-    assert "<x>" not in local_api._strip_html_noncontent("<style >x</style >")
-
-
-def test_strip_html_noncontent_handles_end_tag_with_trailing_junk() -> None:
-    # CodeQL py/bad-tag-filter (#31): browsers accept end tags with trailing
-    # whitespace + junk like `</script\t\n bar>`, so the strict `</script\s*>`
-    # form left the script/style body un-stripped.
-    assert "alert(1)" not in local_api._strip_html_noncontent(
-        "<script>alert(1)</script\t\n bar>tail"
-    )
-    assert "body{}" not in local_api._strip_html_noncontent(
-        "<style>body{}</style\n  junk>tail"
-    )
-
-
-def test_strip_html_noncontent_does_not_overmatch_different_tag_name() -> None:
-    # `</scriptx>` is a different (invalid) tag name, not a script close — the
-    # `\b` boundary must keep it from being treated as a script end tag, so
-    # surrounding real content is preserved.
-    out = local_api._strip_html_noncontent("<script>keep</scriptx><h1>Title</h1>")
-    assert "<h1>Title</h1>" in out
-
-
 def test_build_module_state_rejects_traversal_module_key(tmp_path: Path) -> None:
     # CodeQL py/path-injection (#32): build_module_state re-validates module_key
     # (defense in depth) so a "../" traversal raises before reaching the

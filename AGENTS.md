@@ -64,11 +64,11 @@ and `"$LEARN_UKRAINIAN_PYTHON" -I -m lu_machinery.fleet_comms plane-status`, wit
 relevant files directly; service startup and a full handoff are unnecessary.
 
 Curriculum state comes from the KubeDojo local API at `http://127.0.0.1:8768`
-(start it with `scripts/services-up --api-only`, which binds loopback and serves the
-primary checkout). Before claiming pipeline work, read
+(start it from the primary checkout with
+`.venv/bin/python scripts/local_api.py` (binds 127.0.0.1:8768 by default)). Before claiming pipeline work, read
 `GET /api/pipeline/leases`. Before fixing a module, read
 `GET /api/module/{key}/state`; before re-reviewing it, read
-`GET /api/reviews?module={key}`. Use `/api/tracks/readiness` and `/api/activity`
+`GET /api/reviews?module={key}`. Use `/api/tracks/readiness` and `/api/content/coverage`
 for curriculum-wide coordination. An unreachable API is unknown state, not proof
 of healthy services; `STATUS.md` is only a fallback index.
 

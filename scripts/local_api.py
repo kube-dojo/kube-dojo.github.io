@@ -5,7 +5,6 @@ import hashlib
 import html
 import importlib.util
 import json
-import logging
 import os
 import re
 import shutil
@@ -26,7 +25,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 
 def _load_local_api_submodule(short_name: str, filename: str) -> Any:
-    """Generic loader for local_api/ submodules (routes + repo_guard).
+    """Generic loader for local_api/ submodules.
 
     Uses a stable sys.modules key so repeated imports are cheap and
     the module is executed only once per process. The dance supports
@@ -39,10 +38,7 @@ def _load_local_api_submodule(short_name: str, filename: str) -> Any:
     module_path = Path(__file__).resolve().with_name("local_api") / filename
     spec = importlib.util.spec_from_file_location(module_name, module_path)
     if spec is None or spec.loader is None:
-        # Produce a readable error like the original per-loader messages
-        # (e.g. "cannot load channels from ..." or "cannot load guard from ...")
-        # instead of the ugly "cannot load routes_channels from ...".
-        display = short_name.replace("routes_", "").replace("repo_", "").replace("_", " ")
+        display = short_name.replace("routes_", "").replace("_", " ")
         raise ImportError(f"cannot load {display} from {module_path}")
     module = importlib.util.module_from_spec(spec)
     sys.modules[module_name] = module
@@ -54,16 +50,161 @@ def _load_ui_fragments_module() -> Any:
     return _load_local_api_submodule("routes_ui_fragments", "routes/ui_fragments.py")
 
 
-def _load_repo_guard_module() -> Any:
-    return _load_local_api_submodule("repo_guard", "repo_guard.py")
-
-
 def _ui_fragments_module() -> Any:
     return _load_ui_fragments_module()
 
 
-def _repo_guard_module() -> Any:
-    return _load_repo_guard_module()
+def _git_path(repo_root: Path, *args: str) -> Path | None:
+    """One absolute path printed by ``git -C repo_root <args>``, or ``None``."""
+    try:
+        result = subprocess.run(
+            ["git", "-C", str(repo_root), *args], check=False, capture_output=True, timeout=5,
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        return None
+    out = result.stdout[:-1] if result.stdout.endswith(b"\n") else result.stdout
+    if result.returncode != 0 or not out:
+        return None
+    return Path(os.fsdecode(out)).resolve()
+
+
+def _verified_main_tree(path: Path, common: Path, *, explicit: bool = False) -> Path | None:
+    """The working tree Git reports for ``path``, if it is the main tree of ``common``.
+
+    Git is asked for the top level from ``path`` (which may be a directory
+    inside the checkout, a metadata directory with ``core.worktree`` set, or
+    the checkout itself), and that top level is accepted only when its own
+    git directory is the repository's common directory. With ``explicit``,
+    the first question names ``common`` as the git directory instead of
+    relying on discovery, which ``safe.bareRepository=explicit`` refuses
+    inside a metadata directory.
+    """
+    named = (f"--git-dir={common}",) if explicit else ()
+    top = _git_path(path, *named, "rev-parse", "--path-format=absolute", "--show-toplevel")
+    if top is None:
+        return None
+    top_git_dir = _git_path(top, "rev-parse", "--path-format=absolute", "--git-dir")
+    top_level = _git_path(top, "rev-parse", "--path-format=absolute", "--show-toplevel")
+    return top if top_git_dir == common and top_level == top else None
+
+
+def _primary_checkout(repo_root: Path) -> Path | None:
+    """The main working tree of the repository that holds ``repo_root``, verified through Git.
+
+    A checkout is the main working tree exactly when its git directory is the
+    repository's common directory; that holds for an ordinary checkout and for
+    one whose metadata lives elsewhere (``--separate-git-dir``), and then the
+    answer is its own top level. For a linked worktree, a main tree the
+    metadata itself records (``core.worktree``) is asked for first, naming the
+    common directory explicitly. Otherwise the first entry of
+    ``git worktree list --porcelain`` is only a candidate: Git names the
+    metadata directory there when the main tree keeps its metadata apart. The
+    top level Git reports from the candidate, or else from its nearest
+    ancestor, or else from an ancestor of the linked worktree itself (a main
+    tree that holds its worktrees under ``.worktrees/``), is accepted only
+    when its git directory is the same common directory; a nested repository
+    in between is passed over. The KubeDojo API is a
+    product service and runs on the product interpreter, which does not
+    install lu-machinery, so it asks Git directly. ``None`` when Git cannot
+    answer or confirm, which the health check reports as critical.
+    """
+    top = _git_path(repo_root, "rev-parse", "--path-format=absolute", "--show-toplevel")
+    git_dir = _git_path(repo_root, "rev-parse", "--path-format=absolute", "--git-dir")
+    common = _git_path(repo_root, "rev-parse", "--path-format=absolute", "--git-common-dir")
+    if top is None or git_dir is None or common is None:
+        return None
+    if git_dir == common:
+        return top
+    # A main tree recorded in the metadata itself (``core.worktree``).
+    recorded = _verified_main_tree(common, common, explicit=True)
+    if recorded is not None:
+        return recorded
+    places: list[Path] = []
+    try:
+        listing = subprocess.run(
+            ["git", "-C", str(repo_root), "worktree", "list", "--porcelain", "-z"],
+            check=False, capture_output=True, timeout=5,
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        listing = None
+    first = listing.stdout.split(b"\0", 1)[0] if listing and listing.returncode == 0 else b""
+    if first.startswith(b"worktree "):
+        candidate = Path(os.fsdecode(first[len(b"worktree "):])).resolve()
+        places += [candidate, *candidate.parents]
+    # A linked worktree inside the main tree (``.worktrees/``) when Git lists
+    # only the metadata directory.
+    places += top.parents
+    for path in dict.fromkeys(places):
+        verified = _verified_main_tree(path, common)
+        if verified is not None:
+            return verified
+    return None
+
+
+def _inspect_repo_root(repo_root: Path) -> dict[str, object]:
+    """Validate that the local API is serving from the primary checkout."""
+    resolved = repo_root.resolve()
+    primary = _primary_checkout(resolved)
+    warnings: list[str] = []
+    if primary is None:
+        warnings.append(
+            f"repo_root {resolved}: the primary checkout cannot be determined or verified through Git."
+        )
+    elif resolved != primary:
+        warnings.append(
+            f"repo_root {resolved} is not the primary checkout ({primary}); "
+            "artifact routes may 404 if this process outlives a worktree removal."
+        )
+    try:
+        cwd: Path | None = Path(os.getcwd()).resolve()
+    except OSError:
+        cwd = None
+    if cwd is not None and ".worktrees" in cwd.parts:
+        warnings.append(
+            f"process cwd {cwd} is inside a git worktree; prefer primary repo root for the long-lived service."
+        )
+    api_pid_path = resolved / ".pids" / "api.pid"
+    if api_pid_path.exists():
+        try:
+            pid = int(api_pid_path.read_text(encoding="utf-8").strip())
+        except (OSError, ValueError):
+            warnings.append("api pid file is unreadable.")
+        else:
+            try:
+                os.kill(pid, 0)
+            except PermissionError:
+                warnings.append(
+                    "api pid file references a process this user cannot signal; its state cannot be verified."
+                )
+            except OSError:
+                warnings.append("api pid file references a dead process.")
+    return {
+        "repo_root": str(resolved),
+        "primary_repo_root": str(primary) if primary is not None else None,
+        "process_cwd": str(cwd) if cwd is not None else None,
+        "warnings": warnings,
+    }
+
+
+def _build_healthz_payload(repo_root: Path) -> dict[str, object]:
+    inspection = _inspect_repo_root(repo_root)
+    critical = [
+        warning
+        for warning in inspection["warnings"]
+        if isinstance(warning, str)
+        and (
+            warning.startswith("repo_root ")
+            or "dead process" in warning
+            or "unreadable" in warning
+            or "cannot be verified" in warning
+        )
+    ]
+    return {
+        "ok": not critical,
+        "repo_root": inspection["repo_root"],
+        "primary_repo_root": inspection["primary_repo_root"],
+        "warnings": inspection["warnings"],
+    }
 
 
 def _design_system_link() -> str:
@@ -78,10 +219,10 @@ def _render_poll_stale_script() -> str:
     return _ui_fragments_module().render_poll_stale_script()
 
 
-# Heavy imports (pipeline_v2, status, translation_v2, ztt_status) are deferred
-# into the handlers that actually need them. Measured: moving these out of the
-# module top saves ~150 ms from server startup and keeps /healthz and
-# /api/runtime/services paths dependency-free. See issue #258.
+# Heavy imports (status, translation_v2, ztt_status) are deferred into the
+# handlers that actually need them. Measured: moving these out of the module
+# top saves ~150 ms from server startup and keeps /healthz dependency-free.
+# See issue #258.
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -124,30 +265,6 @@ DEFAULT_HOST = "127.0.0.1"
 DEFAULT_PORT = 8768
 DOCS_ROOT = REPO_ROOT / "src" / "content" / "docs"
 GH_REPO = "kube-dojo/kube-dojo.github.io"
-GH_CACHE_TTL_SECONDS = 60.0
-GENERATED_PREFIXES = (
-    ".astro/",
-    ".dispatch-logs/",
-    ".review-results/",
-    "dist/",
-    "logs/",
-    "site/",
-)
-PIPELINE_PREFIXES = (
-    ".bridge/",
-    ".pipeline/",
-    ".pids/",
-)
-DEFAULT_FEEDBACK_ISSUE = 248
-RUNTIME_SERVICES = (
-    {"name": "dev", "pid_file": ".pids/dev.pid", "port": 4333, "label": "Astro Dev Server"},
-    {"name": "api", "pid_file": ".pids/api.pid", "port": 8768, "label": "Deterministic Local API"},
-    {"name": "feedback", "pid_file": ".pids/feedback.pid", "port": None, "label": "GitHub Issue Watcher"},
-    {"name": "v2-write-worker", "pid_file": ".pids/v2-write-worker.pid", "port": None, "label": "V2 Write Worker"},
-    {"name": "v2-review-worker", "pid_file": ".pids/v2-review-worker.pid", "port": None, "label": "V2 Review Worker"},
-    {"name": "v2-patch-worker", "pid_file": ".pids/v2-patch-worker.pid", "port": None, "label": "V2 Patch Worker"},
-)
-RUNTIME_SERVICE_ORDER = tuple(svc["name"] for svc in RUNTIME_SERVICES)
 
 # Module keys are hierarchical slugs under src/content/docs, e.g.
 # "prerequisites/zero-to-terminal/module-0.1-alpha". Segments only allow
@@ -156,7 +273,6 @@ RUNTIME_SERVICE_ORDER = tuple(svc["name"] for svc in RUNTIME_SERVICES)
 # attempts like "..", ".", or leading-dot hidden names.
 _MODULE_KEY_SEGMENT_RE = re.compile(r"^[a-z0-9][a-z0-9._-]*$")
 _ETAG_HEADER_RE = re.compile(r'^(?:W/)?"[A-Za-z0-9_./:-]+"$')
-_HANDOFF_FILENAME_RE = re.compile(r"^(?P<date>\d{4}-\d{2}-\d{2})-(?P<label>.+)\.(?P<format>md|html)$")
 
 
 def _validate_module_key(repo_root: Path, raw: str) -> str | None:
@@ -747,630 +863,7 @@ def _run_gh_json(*args: str, timeout: int = 10) -> tuple[int, Any]:
         return 502, {"error": "invalid_gh_json", "message": str(exc)}
 
 
-def _normalize_gh_item(item: dict[str, Any]) -> dict[str, Any]:
-    labels = item.get("labels") or []
-    assignees = item.get("assignees") or []
-    comments = item.get("comments") or []
-    return {
-        "number": item.get("number"),
-        "title": item.get("title", ""),
-        "state": item.get("state", ""),
-        "labels": [
-            label.get("name")
-            for label in labels
-            if isinstance(label, dict) and label.get("name")
-        ],
-        "assignees": [
-            assignee.get("login")
-            for assignee in assignees
-            if isinstance(assignee, dict) and assignee.get("login")
-        ],
-        "comments_count": len(comments) if isinstance(comments, list) else 0,
-        "updated_at": item.get("updatedAt", ""),
-        "url": item.get("url", ""),
-    }
-
-
-def _normalize_gh_comments(comments: Any) -> list[dict[str, Any]]:
-    if not isinstance(comments, list):
-        return []
-    normalized: list[dict[str, Any]] = []
-    for comment in comments[-5:]:
-        if not isinstance(comment, dict):
-            continue
-        author = comment.get("author") or {}
-        normalized.append(
-            {
-                "author": author.get("login", "") if isinstance(author, dict) else "",
-                "body": comment.get("body", ""),
-                "created_at": comment.get("createdAt", ""),
-                "url": comment.get("url", ""),
-            }
-        )
-    return normalized
-
-
-def _build_gh_list(kind: str, state: str, limit: int) -> tuple[int, Any, str]:
-    status_code, payload = _run_gh_json(
-        kind,
-        "list",
-        "--state",
-        state,
-        "--limit",
-        str(limit),
-        "--json",
-        _gh_json_fields("number", "title", "state", "labels", "assignees", "comments", "updatedAt", "url"),
-    )
-    if status_code != 200:
-        return status_code, payload, "application/json; charset=utf-8"
-    items = [
-        _normalize_gh_item(item)
-        for item in payload
-        if isinstance(item, dict)
-    ]
-    return 200, {
-        "repo": GH_REPO,
-        "state": state,
-        "limit": limit,
-        "count": len(items),
-        "items": items,
-    }, "application/json; charset=utf-8"
-
-
-def _build_gh_detail(kind: str, number: int) -> tuple[int, Any, str]:
-    fields = ["number", "title", "state", "labels", "assignees", "comments", "updatedAt", "url"]
-    status_code, payload = _run_gh_json(
-        kind,
-        "view",
-        str(number),
-        "--json",
-        _gh_json_fields(*fields),
-    )
-    if status_code != 200:
-        return status_code, payload, "application/json; charset=utf-8"
-    if not isinstance(payload, dict):
-        return 502, {"error": "invalid_gh_json", "message": "expected object"}, "application/json; charset=utf-8"
-    item = _normalize_gh_item(payload)
-    item["comments"] = _normalize_gh_comments(payload.get("comments"))
-    return 200, item, "application/json; charset=utf-8"
-
-
-def _is_gh_path(path: str) -> bool:
-    return path == "/api/gh/issues" or path.startswith("/api/gh/issues/")
-
-
-def _gh_payload_etag(path: str, payload: Any) -> str:
-    latest = "empty"
-    if isinstance(payload, dict):
-        items = payload.get("items")
-        if isinstance(items, list):
-            updated_values = [
-                item.get("updated_at", "")
-                for item in items
-                if isinstance(item, dict) and item.get("updated_at")
-            ]
-            if updated_values:
-                latest = max(updated_values)
-        elif payload.get("updated_at"):
-            latest = str(payload["updated_at"])
-    return _weak_etag(f"{path}:{latest}".encode())
-
-
 # --- Background snapshot ---
-
-
-class BackgroundSnapshot:
-    """Fixed-delay background refresher for an expensive builder.
-
-    Guarantees:
-        - Never more than one refresh in flight.
-        - Atomic snapshot swap: callers see either the old or new snapshot,
-          never a partial one.
-        - Exposes freshness metadata so callers can detect staleness.
-    """
-
-    def __init__(
-        self,
-        key: str,
-        interval_seconds: float,
-        builder: Callable[[], Any],
-        stale_threshold_seconds: float | None = None,
-    ) -> None:
-        self.key = key
-        self.interval_seconds = interval_seconds
-        self.builder = builder
-        # Default stale threshold: 5x refresh interval, min 60s.
-        self.stale_threshold_seconds = (
-            stale_threshold_seconds
-            if stale_threshold_seconds is not None
-            else max(60.0, interval_seconds * 5)
-        )
-        # ``_lock`` protects metadata reads; ``_build_lock`` enforces
-        # single-in-flight so ``refresh_blocking()`` and the background
-        # thread cannot overlap each other's build.
-        self._lock = threading.Lock()
-        self._build_lock = threading.Lock()
-        self._snapshot: Any = None
-        self._started_at: float | None = None
-        self._completed_at: float | None = None
-        self._duration_ms: float | None = None
-        self._last_error: str | None = None
-        self._stop = threading.Event()
-        self._thread: threading.Thread | None = None
-
-    def start(self) -> None:
-        if self._thread is not None:
-            return
-        self._thread = threading.Thread(
-            target=self._run,
-            name=f"snapshot-{self.key}",
-            daemon=True,
-        )
-        self._thread.start()
-
-    def stop(self) -> None:
-        self._stop.set()
-
-    def _run(self) -> None:
-        while not self._stop.is_set():
-            self._refresh_once()
-            # Fixed-delay: sleep AFTER completion so overruns never overlap.
-            self._stop.wait(self.interval_seconds)
-
-    def _refresh_once_locked(self) -> None:
-        """Core refresh, assuming ``_build_lock`` is already held."""
-        started = time.time()
-        with self._lock:
-            self._started_at = started
-        try:
-            snapshot = self.builder()
-            err: str | None = None
-        except Exception as exc:  # noqa: BLE001
-            snapshot = None
-            err = f"{type(exc).__name__}: {exc}"
-        completed = time.time()
-        with self._lock:
-            if snapshot is not None:
-                self._snapshot = snapshot
-            self._completed_at = completed
-            self._duration_ms = (completed - started) * 1000.0
-            self._last_error = err
-
-    def _refresh_once(self) -> None:
-        """Serialize all builders through ``_build_lock``. The real
-        enforcement of the "single in-flight" guarantee."""
-        with self._build_lock:
-            self._refresh_once_locked()
-
-    def refresh_blocking(self, timeout: float | None = None) -> bool:
-        """Trigger one refresh in the calling thread. Returns True if
-        the refresh ran, False if ``timeout`` elapsed while waiting
-        for the build lock. ``timeout=None`` waits forever."""
-        lock_timeout = -1.0 if timeout is None else float(timeout)
-        acquired = self._build_lock.acquire(timeout=lock_timeout)
-        if not acquired:
-            return False
-        try:
-            self._refresh_once_locked()
-        finally:
-            self._build_lock.release()
-        return True
-
-    def get(self) -> tuple[Any, dict[str, Any]]:
-        now = time.time()
-        with self._lock:
-            snapshot = self._snapshot
-            started = self._started_at
-            completed = self._completed_at
-            duration = self._duration_ms
-            error = self._last_error
-        stale_seconds = (now - completed) if completed is not None else None
-        in_flight = (
-            started is not None and (completed is None or started > completed)
-        )
-        if snapshot is None and completed is None:
-            # Never completed a refresh — the caller will have to build sync.
-            state = "refreshing"
-        elif snapshot is None and error is not None:
-            state = "degraded"
-        elif stale_seconds is not None and stale_seconds > self.stale_threshold_seconds:
-            state = "stale"
-        else:
-            state = "fresh"
-        meta = {
-            "refresh_started_at": started,
-            "refresh_completed_at": completed,
-            "refresh_duration_ms": duration,
-            "refresh_error": error,
-            "stale_seconds": stale_seconds,
-            "stale_threshold_seconds": self.stale_threshold_seconds,
-            "freshness_state": state,
-            "refresh_in_flight": in_flight,
-        }
-        return snapshot, meta
-
-
-# Registry of background snapshots. Started lazily on first access so that
-# unit tests and `--help` invocations don't spawn threads.
-_SNAPSHOTS: dict[str, BackgroundSnapshot] = {}
-_SNAPSHOTS_LOCK = threading.Lock()
-
-
-def _register_snapshot(
-    key: str,
-    interval_seconds: float,
-    builder: Callable[[], Any],
-    stale_threshold_seconds: float | None = None,
-) -> BackgroundSnapshot:
-    with _SNAPSHOTS_LOCK:
-        existing = _SNAPSHOTS.get(key)
-        if existing is not None:
-            return existing
-        snap = BackgroundSnapshot(key, interval_seconds, builder, stale_threshold_seconds)
-        _SNAPSHOTS[key] = snap
-    return snap
-
-
-def _classify_path(path: str) -> str:
-    if path.startswith(GENERATED_PREFIXES):
-        return "generated"
-    if path.startswith(PIPELINE_PREFIXES):
-        return "pipeline"
-    if path.startswith(("src/", "scripts/", "tests/", "docs/")):
-        return "source"
-    return "other"
-
-
-def build_worktree_status(repo_root: Path) -> dict[str, Any]:
-    try:
-        result = subprocess.run(
-            ["git", "status", "--porcelain=v1", "--branch"],
-            cwd=repo_root,
-            capture_output=True,
-            text=True,
-            check=False,
-            timeout=5,
-        )
-    except (OSError, subprocess.TimeoutExpired) as exc:
-        return {
-            "repo_root": str(repo_root),
-            "ok": False,
-            "error": f"git status unavailable: {type(exc).__name__}",
-        }
-    if result.returncode != 0:
-        return {
-            "repo_root": str(repo_root),
-            "ok": False,
-            "error": result.stderr.strip() or "git status failed",
-        }
-
-    lines = result.stdout.splitlines()
-    branch = ""
-    ahead = 0
-    behind = 0
-    if lines and lines[0].startswith("## "):
-        branch_line = lines[0][3:]
-        branch = branch_line
-        if "..." in branch_line:
-            branch = branch_line.split("...", 1)[0]
-        if "[ahead " in branch_line:
-            ahead = int(branch_line.split("[ahead ", 1)[1].split("]", 1)[0].split(",")[0])
-        if "[behind " in branch_line:
-            behind = int(branch_line.split("[behind ", 1)[1].split("]", 1)[0].split(",")[0])
-
-    entries: list[dict[str, Any]] = []
-    counts = {
-        "total": 0,
-        "staged": 0,
-        "unstaged": 0,
-        "untracked": 0,
-        "conflicted": 0,
-    }
-    categories = {"source": 0, "generated": 0, "pipeline": 0, "other": 0}
-
-    for line in lines[1:]:
-        if not line.strip():
-            continue
-        if line.startswith("?? "):
-            path = line[3:]
-            staged = False
-            unstaged = False
-            untracked = True
-            conflicted = False
-            index_status = "?"
-            worktree_status = "?"
-        else:
-            index_status = line[0]
-            worktree_status = line[1]
-            path = line[3:]
-            staged = index_status not in {" ", "?"}
-            unstaged = worktree_status not in {" ", "?"}
-            untracked = False
-            conflicted = index_status == "U" or worktree_status == "U"
-        category = _classify_path(path)
-        counts["total"] += 1
-        counts["staged"] += int(staged)
-        counts["unstaged"] += int(unstaged)
-        counts["untracked"] += int(untracked)
-        counts["conflicted"] += int(conflicted)
-        categories[category] += 1
-        entries.append(
-            {
-                "path": path,
-                "index_status": index_status,
-                "worktree_status": worktree_status,
-                "staged": staged,
-                "unstaged": unstaged,
-                "untracked": untracked,
-                "conflicted": conflicted,
-                "category": category,
-            }
-        )
-
-    return {
-        "repo_root": str(repo_root),
-        "ok": True,
-        "branch": branch,
-        "ahead": ahead,
-        "behind": behind,
-        "dirty": counts["total"] > 0,
-        "counts": counts,
-        "categories": categories,
-        "entries": entries,
-    }
-
-
-def build_worktrees_list(repo_root: Path) -> dict[str, Any]:
-    """List every worktree attached to the primary repo.
-
-    Parses ``git worktree list --porcelain``. Returns a compact payload
-    suitable for agent cold-start: agents need to know about sibling
-    worktrees (e.g. ``codex-wt-*``) to avoid colliding on the same branch.
-    """
-    try:
-        result = subprocess.run(
-            ["git", "worktree", "list", "--porcelain"],
-            cwd=repo_root,
-            capture_output=True,
-            text=True,
-            check=False,
-            timeout=5,
-        )
-    except (OSError, subprocess.TimeoutExpired) as exc:
-        return {
-            "ok": False,
-            "error": f"git worktree list unavailable: {type(exc).__name__}",
-            "worktrees": [],
-        }
-    if result.returncode != 0:
-        return {
-            "ok": False,
-            "error": result.stderr.strip() or "git worktree list failed",
-            "worktrees": [],
-        }
-
-    worktrees: list[dict[str, Any]] = []
-    current: dict[str, Any] | None = None
-    for line in result.stdout.splitlines():
-        if not line:
-            if current is not None:
-                worktrees.append(current)
-                current = None
-            continue
-        if line.startswith("worktree "):
-            if current is not None:
-                worktrees.append(current)
-            current = {
-                "path": line[len("worktree ") :],
-                "branch": None,
-                "head": None,
-                "detached": False,
-                "locked": False,
-                "prunable": False,
-            }
-        elif current is None:
-            continue
-        elif line.startswith("HEAD "):
-            current["head"] = line[len("HEAD ") :]
-        elif line.startswith("branch "):
-            # Format: ``branch refs/heads/<name>``.
-            ref = line[len("branch ") :]
-            if ref.startswith("refs/heads/"):
-                current["branch"] = ref[len("refs/heads/") :]
-            else:
-                current["branch"] = ref
-        elif line == "detached":
-            current["detached"] = True
-        elif line.startswith("locked"):
-            current["locked"] = True
-        elif line.startswith("prunable"):
-            current["prunable"] = True
-    if current is not None:
-        worktrees.append(current)
-
-    # Enrich each entry with a dirty-counts summary. This is the
-    # signal operators actually want ("which worktree is lively?")
-    # and without it agents had to shell into every worktree.
-    #
-    # ``dirty`` is tri-state: True/False when counts were obtained,
-    # ``None`` when we couldn't read the worktree (missing path,
-    # permission error, prunable ref). "unknown" and "clean" are
-    # materially different; a False here would be a false negative.
-    for wt in worktrees:
-        wt_path = Path(wt["path"])
-        counts = _worktree_dirty_counts(wt_path) if wt_path.exists() else None
-        wt["counts"] = counts
-        if counts is None:
-            wt["dirty"] = None
-        else:
-            wt["dirty"] = bool(counts.get("total", 0))
-
-    primary_path = str(repo_root)
-    return {
-        "ok": True,
-        "primary": primary_path,
-        "count": len(worktrees),
-        "worktrees": worktrees,
-    }
-
-
-def _worktree_dirty_counts(worktree_path: Path) -> dict[str, Any] | None:
-    """Run ``git status --porcelain=v1`` inside ``worktree_path`` and
-    return a summary of counts. Returns ``None`` on failure so callers
-    can distinguish "unknown" from "clean".
-
-    ``total`` counts each PATH once (matching the primary-worktree
-    ``build_worktree_status`` semantics), so a file that is both
-    staged and unstaged adds 1, not 2. ``staged`` / ``unstaged`` /
-    ``untracked`` remain per-status counts for operators who want
-    breakdowns — those may overlap.
-    """
-    try:
-        result = subprocess.run(
-            ["git", "status", "--porcelain=v1", "--untracked-files=all"],
-            cwd=worktree_path,
-            capture_output=True,
-            text=True,
-            check=False,
-            timeout=5,
-        )
-    except (OSError, subprocess.TimeoutExpired):
-        return None
-    if result.returncode != 0:
-        return None
-    staged = unstaged = untracked = conflicted = 0
-    total_paths = 0
-    for line in result.stdout.splitlines():
-        if not line:
-            continue
-        total_paths += 1
-        if line.startswith("?? "):
-            untracked += 1
-            continue
-        idx = line[0] if line else " "
-        wt = line[1] if len(line) > 1 else " "
-        if idx == "U" or wt == "U":
-            conflicted += 1
-        if idx not in (" ", "?"):
-            staged += 1
-        if wt not in (" ", "?"):
-            unstaged += 1
-    return {
-        # ``total`` is unique-path count (matches primary-worktree
-        # ``build_worktree_status``). staged/unstaged/untracked are
-        # per-status counts and may overlap — a file with both a
-        # staged and an unstaged change is in both sub-counts but
-        # contributes 1 to total.
-        "total": total_paths,
-        "staged": staged,
-        "unstaged": unstaged,
-        "untracked": untracked,
-        "conflicted": conflicted,
-    }
-
-
-def build_git_cleanup_report(repo_root: Path) -> dict[str, Any]:
-    """Report review candidates; no entry authorizes deletion.
-
-    Merge ancestry is required; a gone upstream alone proves nothing about
-    the branch. Ignored files are not included in status and must be preserved
-    or inspected separately before any retirement.
-    """
-    merged: set[str] = set()
-    probe_blockers: list[str] = []
-    try:
-        r = subprocess.run(
-            ["git", "for-each-ref", "--merged", "refs/heads/main", "--format=%(refname)", "refs/heads/"],
-            cwd=repo_root, capture_output=True, text=True, check=False, timeout=5,
-        )
-        if r.returncode == 0:
-            for name in r.stdout.splitlines():
-                name = name.strip()
-                if name and name != "refs/heads/main":
-                    merged.add(name)
-        else:
-            probe_blockers.append("merge-inventory-unavailable")
-    except (OSError, subprocess.TimeoutExpired):
-        probe_blockers.append("merge-inventory-unavailable")
-
-    gone: set[str] = set()
-    try:
-        r = subprocess.run(
-            ["git", "for-each-ref",
-             "--format=%(refname)\t%(upstream:track)",
-             "refs/heads/"],
-            cwd=repo_root, capture_output=True, text=True, check=False, timeout=5,
-        )
-        if r.returncode == 0:
-            for line in r.stdout.splitlines():
-                parts = line.rstrip().split("\t", 1)
-                if len(parts) == 2 and "[gone]" in parts[1]:
-                    gone.add(parts[0])
-        else:
-            probe_blockers.append("upstream-inventory-unavailable")
-    except (OSError, subprocess.TimeoutExpired):
-        probe_blockers.append("upstream-inventory-unavailable")
-
-    wt_result = build_worktrees_list(repo_root)
-    wt_list = wt_result.get("worktrees", [])
-    checked_out = {f"refs/heads/{wt['branch']}" for wt in wt_list if wt.get("branch")}
-    # A failed worktree inventory cannot establish whether a branch is active.
-    if not wt_result.get("ok") or not wt_list:
-        probe_blockers.append("worktree-inventory-unavailable")
-    prunable = sorted(merged - checked_out) if not probe_blockers else []
-    reasons: dict[str, list[str]] = {}
-    for b in merged:
-        r_ = ["merged"]
-        if b in gone:
-            r_.append("upstream-gone")
-        reasons[b] = r_
-
-    prunable_worktrees: list[dict[str, Any]] = []
-    review_worktrees: list[dict[str, Any]] = []
-    primary = wt_list[0].get("path") if wt_list else None
-    for wt in wt_list:
-        br = wt.get("branch")
-        ref = f"refs/heads/{br}" if br else None
-        counts = wt.get("counts")
-        blockers = probe_blockers.copy()
-        if wt.get("path") == primary:
-            blockers.append("primary-worktree")
-        if Path(wt.get("path", "")).resolve() == repo_root.resolve():
-            blockers.append("active-worktree")
-        if wt.get("locked"):
-            blockers.append("locked")
-        if wt.get("detached") or not br or not wt.get("head"):
-            blockers.append("detached-or-unknown")
-        if not isinstance(counts, dict) or not isinstance(counts.get("total"), int):
-            blockers.append("status-unknown")
-        elif counts["total"] != 0:
-            blockers.append("uncommitted-changes")
-        if ref not in merged:
-            blockers.append("merge-unverified")
-        if not blockers:
-            prunable_worktrees.append({
-                "path": wt["path"],
-                "branch": br,
-                "reasons": reasons.get(ref, []),
-            })
-        else:
-            review_worktrees.append({"path": wt.get("path"), "branch": br, "blockers": blockers})
-
-    return {
-        "ok": True,
-        "prunable_branches": [{"name": b.removeprefix("refs/heads/"), "reasons": reasons[b]} for b in prunable],
-        "prunable_worktrees": prunable_worktrees,
-        "review_worktrees": review_worktrees,
-        "review_branches": [
-            {"name": b.removeprefix("refs/heads/"), "blockers": ["merge-unverified"]} for b in sorted(gone - merged)
-        ],
-        "blockers": probe_blockers,
-        "counts": {
-            "branches": len(prunable),
-            "worktrees": len(prunable_worktrees),
-        },
-        "hint": "Review inventory only; inspect and preserve ignored artifacts before retirement.",
-    }
 
 
 def _db_latest_for_module(db_path: Path, module_key: str) -> dict[str, Any] | None:
@@ -2063,95 +1556,6 @@ def build_module_reviews(
 
 
 # ---- bridge messages ----
-
-
-def _resolve_bridge_db_path(repo_root: Path) -> Path:
-    """Locate ``messages.db`` the same way the bridge CLI does.
-
-    Precedence:
-      1. ``$AB_DB_PATH`` — unconditional. An explicit override must
-         win even if the file doesn't yet exist; the caller surfaces
-         ``exists=False`` when that happens. (Codex round-2 caught that
-         previously we only honored AB_DB_PATH when the file already
-         existed — quietly reading the wrong DB on a fresh override.)
-      2. ``.bridge/messages.db`` — the legacy bridge database path
-         from the repo setup guide; the repo convention.
-      3. ``.mcp/servers/message-broker/messages.db`` — the upstream
-         Python default when no wrapper is used.
-    Within 2 and 3, the first existing file wins; if neither exists,
-    the convention path (2) is returned.
-    """
-    explicit = os.environ.get("AB_DB_PATH")
-    if explicit:
-        return Path(explicit)
-    candidates = [
-        repo_root / ".bridge" / "messages.db",
-        repo_root / ".mcp" / "servers" / "message-broker" / "messages.db",
-    ]
-    for p in candidates:
-        if p.exists():
-            return p
-    return candidates[0]
-
-
-def build_bridge_messages(
-    repo_root: Path,
-    since: str | None = None,
-    limit: int = 100,
-) -> dict[str, Any]:
-    """Recent agent-bridge messages from the bridge DB.
-
-    Filter ``since`` is an ISO-8601 timestamp (string comparison is
-    safe — the bridge stores ISO-8601 UTC). ``limit`` caps at 500 rows
-    so a single call can't overwhelm a polling agent.
-    """
-    db_path = _resolve_bridge_db_path(repo_root)
-    if not db_path.exists():
-        return {"db_path": str(db_path), "exists": False, "count": 0, "messages": []}
-    capped = max(1, min(int(limit), 500))
-    if since:
-        rows = _query_sqlite_rows(
-            db_path,
-            f"""
-            SELECT id, task_id, from_llm, to_llm, message_type,
-                   content, timestamp, acknowledged, status
-            FROM messages
-            WHERE timestamp >= ?
-            ORDER BY id DESC
-            LIMIT {capped}
-            """,
-            (since,),
-            limit=capped,
-        )
-    else:
-        rows = _query_sqlite_rows(
-            db_path,
-            f"""
-            SELECT id, task_id, from_llm, to_llm, message_type,
-                   content, timestamp, acknowledged, status
-            FROM messages
-            ORDER BY id DESC
-            LIMIT {capped}
-            """,
-            limit=capped,
-        )
-    # Truncate message content to a readable preview so a burst of
-    # long messages doesn't blow up the response. Full content stays
-    # accessible via the bridge CLI.
-    for row in rows:
-        content = row.get("content")
-        if isinstance(content, str) and len(content) > 400:
-            row["content_preview"] = content[:400] + "… (truncated)"
-            row["content_full_length"] = len(content)
-            row.pop("content", None)
-    return {
-        "db_path": str(db_path),
-        "exists": True,
-        "since": since,
-        "limit": capped,
-        "count": len(rows),
-        "messages": rows,
-    }
 
 
 # ---- #388 dispatcher batch progress ----
@@ -3143,458 +2547,6 @@ def build_issue_watch_state(repo_root: Path, issue_number: int) -> dict[str, Any
         "comments_count": len(comments) if isinstance(comments, list) else 0,
         "last_comment": last_comment,
     }
-
-
-def _process_age_seconds(pid: int) -> float | None:
-    """Return the process's elapsed running time in seconds, or None if unknown.
-
-    Uses POSIX `ps -o etime=` (portable across Linux and macOS). Parsing
-    handles the `[[DD-]HH:]MM:SS` format `ps` emits.
-    """
-    try:
-        result = subprocess.run(
-            ["ps", "-p", str(pid), "-o", "etime="],
-            capture_output=True,
-            text=True,
-            timeout=2,
-            check=False,
-        )
-    except (FileNotFoundError, OSError, subprocess.TimeoutExpired):
-        return None
-    if result.returncode != 0:
-        return None
-    etime = result.stdout.strip()
-    if not etime:
-        return None
-    try:
-        days = 0
-        if "-" in etime:
-            days_str, etime = etime.split("-", 1)
-            days = int(days_str)
-        parts = etime.split(":")
-        if len(parts) == 3:
-            hours, minutes, seconds = (int(p) for p in parts)
-        elif len(parts) == 2:
-            hours = 0
-            minutes, seconds = (int(p) for p in parts)
-        else:
-            return None
-    except ValueError:
-        return None
-    return float(days * 86400 + hours * 3600 + minutes * 60 + seconds)
-
-
-# If a process's age exceeds the pid-file age by more than this many seconds,
-# treat the PID as reused (the real owner exited and a new process inherited
-# the PID). 60s absorbs normal pid-file write jitter.
-_PID_REUSE_SLACK_SECONDS = 60.0
-
-
-def _inspect_pid_file(pid_path: Path) -> dict[str, Any]:
-    """Read a pid file and probe the process. Returns pid, status, uptime, stale flag.
-
-    Detects PID reuse: if the live process started meaningfully before the
-    pid file was written, the pid file is treated as stale rather than
-    claiming a healthy service.
-    """
-    pid: int | None = None
-    status = "stopped"
-    uptime_seconds: float | None = None
-    stale_pid_file = False
-    pid_file_mtime: float | None = None
-
-    if not pid_path.exists():
-        return {
-            "pid": None,
-            "status": "stopped",
-            "uptime_seconds": None,
-            "stale_pid_file": False,
-            "pid_file_mtime": None,
-        }
-
-    try:
-        stat_result = pid_path.stat()
-        pid_file_mtime = stat_result.st_mtime
-    except OSError:
-        pid_file_mtime = None
-
-    try:
-        pid = int(pid_path.read_text(encoding="utf-8").strip())
-    except (OSError, ValueError):
-        pid = None
-
-    if pid is not None:
-        try:
-            os.kill(pid, 0)  # Signal 0 probes existence without delivering a signal.
-        except OSError:
-            status = "stale"
-            stale_pid_file = True
-        else:
-            proc_age = _process_age_seconds(pid)
-            if proc_age is not None and pid_file_mtime is not None:
-                pid_file_age = max(0.0, time.time() - pid_file_mtime)
-                if proc_age > pid_file_age + _PID_REUSE_SLACK_SECONDS:
-                    # Process existed long before the pid file was written -> reused PID.
-                    status = "stale"
-                    stale_pid_file = True
-                else:
-                    status = "running"
-                    uptime_seconds = proc_age
-            else:
-                status = "running"
-                if pid_file_mtime is not None:
-                    uptime_seconds = max(0.0, time.time() - pid_file_mtime)
-    else:
-        status = "stale"
-        stale_pid_file = True
-
-    return {
-        "pid": pid,
-        "status": status,
-        "uptime_seconds": uptime_seconds,
-        "stale_pid_file": stale_pid_file,
-        "pid_file_mtime": pid_file_mtime,
-    }
-
-
-def _humanize_service_name(name: str) -> str:
-    return name.replace("-", " ").replace("_", " ").title()
-
-
-def build_runtime_services_status(repo_root: Path) -> dict[str, Any]:
-    services: list[dict[str, Any]] = []
-    running = 0
-    stopped = 0
-    stale = 0
-
-    seen_names: set[str] = set()
-    for svc in RUNTIME_SERVICES:
-        pid_path = repo_root / svc["pid_file"]
-        probe = _inspect_pid_file(pid_path)
-        seen_names.add(svc["name"])
-        if probe["status"] == "running":
-            running += 1
-        elif probe["status"] == "stale":
-            stale += 1
-        else:
-            stopped += 1
-        services.append(
-            {
-                "name": svc["name"],
-                "label": svc["label"],
-                "status": probe["status"],
-                "pid": probe["pid"],
-                "port": svc["port"],
-                "pid_file": str(pid_path),
-                "uptime_seconds": probe["uptime_seconds"],
-                "stale_pid_file": probe["stale_pid_file"],
-                "known": True,
-            }
-        )
-
-    # Auto-discover pid files not covered by the curated list so operators can
-    # see workers spawned by scripts that haven't been registered yet.
-    pids_dir = repo_root / ".pids"
-    if pids_dir.is_dir():
-        for pid_path in sorted(pids_dir.glob("*.pid")):
-            name = pid_path.stem
-            if name in seen_names:
-                continue
-            probe = _inspect_pid_file(pid_path)
-            if probe["status"] == "running":
-                running += 1
-            elif probe["status"] == "stale":
-                stale += 1
-            else:
-                stopped += 1
-            services.append(
-                {
-                    "name": name,
-                    "label": _humanize_service_name(name),
-                    "status": probe["status"],
-                    "pid": probe["pid"],
-                    "port": None,
-                    "pid_file": str(pid_path),
-                    "uptime_seconds": probe["uptime_seconds"],
-                    "stale_pid_file": probe["stale_pid_file"],
-                    "known": False,
-                }
-            )
-
-    return {
-        "running": running,
-        "stopped": stopped,
-        "stale": stale,
-        "total": running + stopped + stale,
-        "services": services,
-        "repo": _repo_guard_module().inspect_repo_root(repo_root),
-    }
-
-
-def build_recent_activity(repo_root: Path) -> dict[str, Any]:
-    """Recent operator-relevant activity across git, pipeline, bridge, and watched issue.
-
-    Keeps the payload compact and deterministic so humans and agents can answer
-    "what changed recently?" without stitching together git log, queue reads,
-    bridge DB tails, and issue-watch files themselves.
-    """
-    commits = _recent_commits(repo_root, limit=10)
-
-    try:
-        pipeline = build_pipeline_events(repo_root, None, None, limit=15)
-    except Exception as exc:  # noqa: BLE001
-        pipeline = {"error": f"{type(exc).__name__}: {exc}", "events": []}
-
-    pipeline_events = []
-    if isinstance(pipeline, dict):
-        for event in (pipeline.get("events") or [])[:10]:
-            pipeline_events.append(
-                {
-                    "id": event.get("id"),
-                    "type": event.get("type"),
-                    "module_key": event.get("module_key"),
-                    "at": event.get("at"),
-                }
-            )
-
-    try:
-        bridge = build_bridge_messages(repo_root, None, limit=10)
-    except Exception as exc:  # noqa: BLE001
-        bridge = {"error": f"{type(exc).__name__}: {exc}", "messages": []}
-
-    bridge_messages = []
-    if isinstance(bridge, dict):
-        for msg in (bridge.get("messages") or [])[:8]:
-            bridge_messages.append(
-                {
-                    "id": msg.get("id"),
-                    "created_at": msg.get("created_at"),
-                    "from_agent": msg.get("from_agent"),
-                    "to_agent": msg.get("to_agent"),
-                    "kind": msg.get("kind"),
-                    "task_id": msg.get("task_id"),
-                }
-            )
-
-    issue = build_issue_watch_state(repo_root, DEFAULT_FEEDBACK_ISSUE)
-    watched_issue = None
-    if issue:
-        watched_issue = {
-            "number": issue.get("number") or DEFAULT_FEEDBACK_ISSUE,
-            "title": issue.get("title"),
-            "state": issue.get("state"),
-            "updated_at": issue.get("updated_at") or issue.get("updatedAt"),
-            "comments_count": issue.get("comments_count") or len(issue.get("comments") or []),
-            "latest_comment_preview": issue.get("latest_comment_preview"),
-            "url": issue.get("url") or issue.get("html_url"),
-        }
-
-    return {
-        "generated_at": time.time(),
-        "recent_commits": commits,
-        "pipeline_events": pipeline_events,
-        "bridge_messages": bridge_messages,
-        "watched_issue": watched_issue,
-    }
-
-
-_ACTIVITY_DEFAULT_SINCE_SECONDS = 86400  # 24h
-_ACTIVITY_MAX_LIMIT = 500
-
-
-def _iso_to_epoch(value: Any) -> int | None:
-    """Parse an ISO-8601 timestamp to Unix-epoch seconds.
-
-    Accepts the bridge's ``YYYY-MM-DDTHH:MM:SS[.ffffff][Z|+00:00]`` shape.
-    Returns ``None`` on unparseable / absent input so the caller can drop
-    the item rather than anchoring the feed at epoch-0.
-    """
-    if not isinstance(value, str) or not value:
-        return None
-    from datetime import UTC, datetime
-    text = value.strip()
-    if text.endswith("Z"):
-        text = text[:-1] + "+00:00"
-    try:
-        dt = datetime.fromisoformat(text)
-    except ValueError:
-        return None
-    if dt.tzinfo is None:
-        dt = dt.replace(tzinfo=UTC)
-    return int(dt.timestamp())
-
-
-def _recent_commits_with_time(
-    repo_root: Path,
-    *,
-    since_seconds: int | None = None,
-    limit: int = 50,
-) -> list[dict[str, Any]]:
-    """Like ``_recent_commits`` but each row carries a committer-time ``at``.
-
-    Used by the merged activity feed so commits can be sorted against
-    pipeline events and bridge messages on a single axis. ``since_seconds``
-    is applied via ``git log --since=@<epoch>`` (inclusive).
-    """
-    capped = max(1, min(int(limit), 500))
-    cmd = ["git", "log", f"-n{capped}", "--pretty=format:%h%x09%ct%x09%s"]
-    if since_seconds is not None:
-        cmd.insert(2, f"--since=@{int(since_seconds)}")
-    try:
-        result = subprocess.run(
-            cmd,
-            cwd=repo_root,
-            capture_output=True,
-            text=True,
-            check=False,
-            timeout=5,
-        )
-    except (OSError, subprocess.TimeoutExpired):
-        return []
-    if result.returncode != 0:
-        return []
-    commits: list[dict[str, Any]] = []
-    for line in result.stdout.splitlines():
-        parts = line.split("\t", 2)
-        if len(parts) != 3:
-            continue
-        sha, ct, subject = parts
-        try:
-            at = int(ct)
-        except ValueError:
-            continue
-        commits.append({"sha": sha, "at": at, "subject": subject})
-    return commits
-
-
-def build_activity_feed(
-    repo_root: Path,
-    *,
-    since_seconds: int | None = None,
-    limit: int = 50,
-    now_seconds: int | None = None,
-) -> dict[str, Any]:
-    """Merged chronological feed: git commits + pipeline v2 events + bridge messages.
-
-    Everything is normalized to one item shape so operators see a single
-    timeline. Each source is fetched with a per-source cap of ``4 * limit``
-    (min 50) before merging so a quiet source isn't crowded out at the
-    merge boundary. Items with an unparseable timestamp are dropped, not
-    anchored at 0 — otherwise they'd always rank last in ascending order
-    or first in descending, hiding real recent activity.
-
-    Defaults: ``since_seconds`` = now − 24 h, ``limit`` = 50 (max 500).
-    """
-    now_seconds = now_seconds if now_seconds is not None else int(time.time())
-    if since_seconds is None:
-        since_seconds = now_seconds - _ACTIVITY_DEFAULT_SINCE_SECONDS
-    capped = max(1, min(int(limit), _ACTIVITY_MAX_LIMIT))
-    per_source_cap = max(capped * 4, 50)
-
-    items: list[dict[str, Any]] = []
-    source_counts: dict[str, int] = {
-        "commit": 0,
-        "pipeline_event": 0,
-        "bridge_message": 0,
-    }
-    errors: dict[str, str] = {}
-
-    try:
-        commits = _recent_commits_with_time(
-            repo_root, since_seconds=since_seconds, limit=per_source_cap
-        )
-    except Exception as exc:  # noqa: BLE001
-        commits = []
-        errors["commit"] = f"{type(exc).__name__}: {exc}"
-    for c in commits:
-        items.append({
-            "source": "commit",
-            "at": c.get("at"),
-            "kind": "commit",
-            "module_key": None,
-            "summary": c.get("subject"),
-            "ref": {"sha": c.get("sha")},
-        })
-        source_counts["commit"] += 1
-
-    # Pipeline events: order by ``at`` DESC (NOT ``id`` DESC). Event
-    # rows can be backfilled with an older ``at`` than their ``id`` —
-    # ``build_pipeline_events`` uses ``id`` ordering for its own
-    # purposes, but using that here would let a high-id/low-at
-    # backfill consume a per-source slot and push a genuinely newer
-    # event out of the merge candidates. See Codex Phase D review.
-    try:
-        db_path = repo_root / ".pipeline" / "v2.db"
-        if db_path.exists():
-            event_rows = _query_sqlite_rows(
-                db_path,
-                """
-                SELECT id, type, module_key, lease_id, at
-                FROM events
-                WHERE at >= ?
-                ORDER BY at DESC
-                LIMIT ?
-                """,
-                (int(since_seconds), int(per_source_cap)),
-            )
-        else:
-            event_rows = []
-    except Exception as exc:  # noqa: BLE001
-        event_rows = []
-        errors["pipeline_event"] = f"{type(exc).__name__}: {exc}"
-    for e in event_rows:
-        items.append({
-            "source": "pipeline_event",
-            "at": e.get("at"),
-            "kind": e.get("type"),
-            "module_key": e.get("module_key"),
-            "summary": None,
-            "ref": {"event_id": e.get("id"), "lease_id": e.get("lease_id")},
-        })
-        source_counts["pipeline_event"] += 1
-
-    # Bridge messages: fetch newest-first WITHOUT a SQL ``since`` filter,
-    # then filter in Python via ``_iso_to_epoch``. The SQL filter is a
-    # lexical string compare against an ISO timestamp column that may
-    # contain fractional seconds or ``+00:00`` offsets — a ``...Z``
-    # cutoff lexically drops ``...0.500Z`` and ``...+00:00`` rows even
-    # when they represent later absolute times. See Codex Phase D review.
-    try:
-        bridge = build_bridge_messages(repo_root, None, limit=per_source_cap)
-    except Exception as exc:  # noqa: BLE001
-        bridge = {"messages": []}
-        errors["bridge_message"] = f"{type(exc).__name__}: {exc}"
-    for m in (bridge.get("messages") or []):
-        at = _iso_to_epoch(m.get("timestamp"))
-        if at is None or at < since_seconds:
-            continue
-        items.append({
-            "source": "bridge_message",
-            "at": at,
-            "kind": m.get("message_type"),
-            "module_key": None,
-            "summary": f"{m.get('from_llm') or '?'}→{m.get('to_llm') or '?'}",
-            "ref": {"message_id": m.get("id"), "task_id": m.get("task_id")},
-        })
-        source_counts["bridge_message"] += 1
-
-    # Drop items with no usable timestamp (would cluster at the top/bottom
-    # depending on sort direction and mislead operators).
-    items = [it for it in items if isinstance(it.get("at"), (int, float))]
-    items.sort(key=lambda it: int(it["at"]), reverse=True)
-    items = items[:capped]
-
-    payload: dict[str, Any] = {
-        "generated_at": now_seconds,
-        "since_seconds": since_seconds,
-        "limit": capped,
-        "count": len(items),
-        "source_counts": source_counts,
-        "items": items,
-    }
-    if errors:
-        payload["errors"] = errors
-    return payload
 
 
 # ---- Phase D: per-section track readiness ----
@@ -5227,37 +4179,6 @@ def render_artifacts_index_html(
 </body></html>"""
 
 
-def _truncate_text(text: str, *, limit: int = 600) -> str:
-    cleaned = re.sub(r"\s+", " ", text).strip()
-    if len(cleaned) <= limit:
-        return cleaned
-    return cleaned[: limit - 3].rstrip() + "..."
-
-
-def _html_fragment_to_text(fragment: str) -> str:
-    no_tags = re.sub(r"<[^>]+>", " ", fragment)
-    return html.unescape(re.sub(r"\s+", " ", no_tags)).strip()
-
-
-def _strip_html_noncontent(text: str) -> str:
-    text = re.sub(r"<!--.*?-->", " ", text, flags=re.DOTALL)
-    # End-tag patterns use `</script\b[^>]*>` (not `</script\s*>`): browsers
-    # accept end tags with trailing junk like `</script\t\n bar>`, so the strict
-    # form would leave script/style content un-stripped (CodeQL py/bad-tag-filter,
-    # alert #31). `\b` keeps `</scriptx>` from matching a different tag name.
-    text = re.sub(r"<script\b[^>]*>.*?</script\b[^>]*>", " ", text, flags=re.IGNORECASE | re.DOTALL)
-    return re.sub(r"<style\b[^>]*>.*?</style\b[^>]*>", " ", text, flags=re.IGNORECASE | re.DOTALL)
-
-
-def _extract_html_h1(text: str) -> str | None:
-    text = _strip_html_noncontent(text)
-    match = re.search(r"<h1\b[^>]*>(.*?)</h1>", text, re.IGNORECASE | re.DOTALL)
-    if not match:
-        return None
-    title = _html_fragment_to_text(match.group(1))
-    return title or None
-
-
 def _extract_markdown_h1(text: str) -> str | None:
     for line in text.splitlines():
         stripped = line.strip()
@@ -5267,175 +4188,18 @@ def _extract_markdown_h1(text: str) -> str | None:
     return None
 
 
-def _extract_html_tldr(text: str) -> str | None:
-    text = _strip_html_noncontent(text)
-    tldr_section = re.search(
-        r"<(?:h2|h3|p)\b[^>]*>\s*(?:TL;DR|TLDR)\s*</(?:h2|h3|p)>\s*<p\b[^>]*>(.*?)</p>",
-        text,
-        re.IGNORECASE | re.DOTALL,
-    )
-    if tldr_section:
-        tldr = _html_fragment_to_text(tldr_section.group(1))
-        if tldr:
-            return _truncate_text(tldr)
-    paragraph = re.search(r"<p\b[^>]*>(.*?)</p>", text, re.IGNORECASE | re.DOTALL)
-    if paragraph:
-        tldr = _html_fragment_to_text(paragraph.group(1))
-        if tldr:
-            return _truncate_text(tldr)
-    return None
-
-
-def _extract_markdown_tldr(text: str) -> str | None:
-    lines = text.splitlines()
-    for idx, line in enumerate(lines):
-        stripped = line.strip()
-        if re.match(r"^#{1,3}\s*(?:TL;DR|TLDR)\b", stripped, re.IGNORECASE):
-            body: list[str] = []
-            for candidate in lines[idx + 1 :]:
-                candidate = candidate.strip()
-                if not candidate:
-                    if body:
-                        break
-                    continue
-                if candidate.startswith("#"):
-                    break
-                body.append(candidate)
-            if body:
-                return _truncate_text(" ".join(body))
-        if re.match(r"^(?:\*\*)?TL;DR(?:\*\*)?\s*[:-]\s*", stripped, re.IGNORECASE):
-            tldr = re.sub(r"^(?:\*\*)?TL;DR(?:\*\*)?\s*[:-]\s*", "", stripped, flags=re.IGNORECASE)
-            if tldr:
-                return _truncate_text(tldr)
-
-    paragraph: list[str] = []
-    in_frontmatter = False
-    for line in lines:
-        stripped = line.strip()
-        if stripped == "---" and not paragraph:
-            in_frontmatter = not in_frontmatter
-            continue
-        if in_frontmatter or not stripped or stripped.startswith(("#", "|")):
-            if paragraph:
-                break
-            continue
-        paragraph.append(stripped)
-    if paragraph:
-        return _truncate_text(" ".join(paragraph))
-    return None
-
-
-def _handoff_metadata(repo_root: Path, path: Path, *, include_detail: bool) -> dict[str, Any] | None:
-    match = _HANDOFF_FILENAME_RE.match(path.name)
-    if not match or path.name.startswith("archive-pre-"):
-        return None
-    try:
-        rel = path.relative_to(repo_root).as_posix()
-    except ValueError:
-        return None
-    metadata: dict[str, Any] = {
-        "filename": path.name,
-        "path": rel,
-        "date": match.group("date"),
-        "session_label": match.group("label"),
-        "format": match.group("format"),
-    }
-    if not include_detail:
-        return metadata
-
-    try:
-        text = path.read_text(encoding="utf-8", errors="replace")
-    except OSError:
-        text = ""
-    is_html = metadata["format"] == "html"
-    title = _extract_html_h1(text) if is_html else _extract_markdown_h1(text)
-    tldr = _extract_html_tldr(text) if is_html else _extract_markdown_tldr(text)
-    raw_url = (
-        f"/artifacts/{rel}"
-        if rel.startswith(("docs/session-state/", ".agent/session-state/"))
-        else None
-    )
-    metadata.update(
-        {
-            "render_url": f"http://127.0.0.1:8910/{rel}",
-            "raw_url": raw_url,
-            "title": title,
-            "tldr": tldr,
-        }
-    )
-    return metadata
-
-
-def build_current_session(repo_root: Path) -> dict[str, Any]:
-    # Live handoffs are LOCAL agent state in the gitignored ``.agent/session-state/``
-    # (s196, user 2026-07-07 — learn-ukrainian parity #3768/#4704: handoffs never go
-    # through git/PRs); ``docs/session-state/`` holds the tracked pre-s196 history.
-    # Scan BOTH; date-prefixed filenames sort chronologically across dirs.
-    handoff_dirs = (
-        repo_root / ".agent" / "session-state",
-        repo_root / "docs" / "session-state",
-    )
-    entries: list[tuple[dict[str, Any], Path]] = []
-    for handoff_dir in handoff_dirs:
-        if not handoff_dir.is_dir():
-            continue
-        for path in handoff_dir.iterdir():
-            if not path.is_file() or path.suffix.lower() not in {".md", ".html"}:
-                continue
-            metadata = _handoff_metadata(repo_root, path, include_detail=False)
-            if metadata is not None:
-                entries.append((metadata, path))
-
-    entries.sort(key=lambda item: item[0]["filename"], reverse=True)
-    latest = None
-    predecessors: list[dict[str, Any]] = []
-    if entries:
-        latest = _handoff_metadata(repo_root, entries[0][1], include_detail=True)
-        predecessors = [meta for meta, _ in entries[1:11]]
-
-    return {
-        "latest": latest,
-        "predecessors": predecessors,
-        "total_handoffs": len(entries),
-    }
-
-
 def build_state_manifest() -> dict[str, Any]:
-    """Pointer-only index for canonical cold-start state discovery."""
+    """Pointer-only index for KubeDojo local API discovery."""
     return {
         "version": 1,
         "categories": [
             {
-                "category": "cold_start",
+                "category": "discovery",
                 "entries": [
-                    {
-                        "name": "Session briefing",
-                        "path": "/api/briefing/session",
-                        "purpose": "Full agent orientation snapshot with current actions, blockers, and repo state.",
-                        "type": "api",
-                    },
-                    {
-                        "name": "Compact session briefing",
-                        "path": "/api/briefing/session?compact=1",
-                        "purpose": "Token-light briefing for first contact on a fresh agent session.",
-                        "type": "api",
-                    },
-                    {
-                        "name": "Current session handoff",
-                        "path": "/api/session/current",
-                        "purpose": "Most recent session handoff plus predecessor chain.",
-                        "type": "api",
-                    },
                     {
                         "name": "API schema",
                         "path": "/api/schema",
                         "purpose": "Machine-readable index of local API routes and query conventions.",
-                        "type": "api",
-                    },
-                    {
-                        "name": "Orientation punch-line",
-                        "path": "/api/orient",
-                        "purpose": "Single primary action + up to 3 alternatives + blockers/alerts. Maximum signal-to-token.",
                         "type": "api",
                     },
                 ],
@@ -5454,7 +4218,6 @@ def build_state_manifest() -> dict[str, Any]:
             {
                 "category": "git_and_build",
                 "entries": [
-                    {"name": "Git worktrees", "path": "/api/git/worktrees", "purpose": "Attached worktrees and cleanup candidates.", "type": "api"},
                     {"name": "Missing modules", "path": "/api/missing-modules/status", "purpose": "Modules missing from navigation or sidebar.", "type": "api"},
                     {"name": "Build job status", "path": "/api/build/status", "purpose": "Poll Astro build job progress by job_id.", "type": "api"},
                 ],
@@ -6413,82 +5176,6 @@ def render_quality_module_page_html(repo_root: Path, module_key: str) -> str | N
 # ============================================================
 
 
-# Keyed by resolved path so different repos' STATUS.md files never alias.
-_STATUS_MD_CACHE: dict[str, dict[str, Any]] = {}
-_STATUS_MD_CACHE_LOCK = threading.Lock()
-
-
-def _live_status_path(repo_root: Path) -> Path:
-    """Resolve the LIVE status index: ``.agent/STATUS.md`` when present.
-
-    Session handoffs + the live status index are LOCAL agent state, not
-    curriculum (user directive s190b, memory
-    ``feedback_handoff_commit_direct_no_worktree``). The live per-session
-    index lives in the gitignored ``.agent/STATUS.md`` so ending a session
-    never dirties git; the tracked ``STATUS.md`` keeps the durable sections
-    (Active policies, historical index snapshot) and is updated via PR only.
-    Falls back to the tracked file when no live copy exists (fresh clones,
-    CI, worktrees).
-    """
-    live = repo_root / ".agent" / "STATUS.md"
-    if live.is_file():
-        return live
-    return repo_root / "STATUS.md"
-
-
-def _parse_status_md(status_path: Path) -> dict[str, Any]:
-    """Extract focus + blockers + a light summary from STATUS.md.
-
-    Caches by absolute path + mtime to keep briefing cheap and to stay
-    safe when multiple repos share one Python process.
-    """
-    try:
-        mtime = status_path.stat().st_mtime
-    except OSError:
-        return {"focus": [], "blockers": [], "exists": False}
-
-    cache_key = str(status_path.resolve())
-    with _STATUS_MD_CACHE_LOCK:
-        entry = _STATUS_MD_CACHE.get(cache_key)
-        if entry is not None and entry["mtime"] == mtime:
-            return entry["data"]
-
-    try:
-        text = status_path.read_text(encoding="utf-8")
-    except OSError:
-        return {"focus": [], "blockers": [], "exists": False}
-
-    focus: list[str] = []
-    blockers: list[str] = []
-    section = None
-    for raw_line in text.splitlines():
-        line = raw_line.rstrip()
-        if line.startswith("## "):
-            heading = line[3:].strip().lower()
-            if heading.startswith("todo"):
-                section = "todo"
-            elif heading.startswith("blocker"):
-                section = "blocker"
-            else:
-                section = None
-            continue
-        if section == "todo":
-            # Only collect unchecked items: - [ ] ...
-            if line.lstrip().startswith("- [ ]"):
-                bullet = line.lstrip()[5:].strip()
-                if bullet and len(focus) < 10:
-                    focus.append(bullet)
-        elif section == "blocker" and line.lstrip().startswith("- "):
-            bullet = line.lstrip()[2:].strip()
-            if bullet and len(blockers) < 10:
-                blockers.append(bullet)
-
-    data = {"focus": focus, "blockers": blockers, "exists": True}
-    with _STATUS_MD_CACHE_LOCK:
-        _STATUS_MD_CACHE[cache_key] = {"mtime": mtime, "data": data}
-    return data
-
-
 _AI_HISTORY_PARTS: tuple[dict[str, Any], ...] = (
     {"part": 1, "name": "The Mathematical Foundations", "range": (1, 5), "issue": 399},
     {"part": 2, "name": "The Analog Dream & Digital Blank Slate", "range": (6, 10), "issue": 400},
@@ -6649,551 +5336,16 @@ def build_book_briefing(repo_root: Path) -> dict[str, Any]:
     }
 
 
-def _recent_commits(repo_root: Path, limit: int = 5) -> list[dict[str, Any]]:
-    result = subprocess.run(
-        ["git", "log", f"-n{limit}", "--pretty=format:%h%x09%s"],
-        cwd=repo_root,
-        capture_output=True,
-        text=True,
-        check=False,
-        timeout=5,
-    )
-    if result.returncode != 0:
-        return []
-    commits: list[dict[str, Any]] = []
-    for line in result.stdout.splitlines():
-        if "\t" in line:
-            sha, subject = line.split("\t", 1)
-        else:
-            sha, subject = line[:8], line[8:].lstrip()
-        commits.append({"sha": sha, "subject": subject})
-    return commits
-
-
-def _pipeline_summary_safe(repo_root: Path) -> dict[str, Any] | None:
-    """Return pipeline v2 summary. None if DB absent; error dict if broken.
-
-    Shape map from ``status._build_status_report``:
-      - ``counts``: {pending_review, pending_write, pending_patch,
-                     in_progress, dead_letter, done}
-      - ``needs_human_count``: dead-letter count after resolution
-      - ``total_modules``, ``convergence_rate``, ``flapping_count``
-
-    ``queue_head`` collapses those into actionable buckets callers can
-    promote into briefing actions:
-      - ``ready`` = pending_review + pending_write + pending_patch
-      - ``in_progress`` = ``counts.in_progress``
-      - ``dead_letter`` = ``counts.dead_letter`` (a.k.a. needs-human)
-    """
-    db_path = repo_root / ".pipeline" / "v2.db"
-    if not db_path.exists():
-        return None
-    try:
-        from status import _build_status_report as build_v2_status_report
-        report = build_v2_status_report(db_path)
-    except Exception as exc:  # noqa: BLE001
-        return {"error": f"{type(exc).__name__}: {exc}"}
-    if not isinstance(report, dict):
-        return {"error": "non_dict_report"}
-
-    counts = report.get("counts") or {}
-    ready = sum(
-        int(counts.get(k, 0))
-        for k in ("pending_review", "pending_write", "pending_patch")
-    )
-    queue_head = {
-        "ready": ready,
-        "in_progress": int(counts.get("in_progress", 0)),
-        "dead_letter": int(counts.get("dead_letter", 0)),
-    }
-    # Briefing is a cold-start hot path; keep the payload compact.
-    # Full ``counts`` / ``convergence_rate`` live on
-    # /api/pipeline/v2/status; here we expose only the actionable
-    # summary an agent needs before deciding what to do.
-    return {
-        "total_modules": report.get("total_modules"),
-        "needs_human_count": report.get("needs_human_count"),
-        "queue_head": queue_head,
-    }
-
-
-def _git_hygiene_signals(
-    repo_root: Path,
-    worktree: dict[str, Any],
-    worktrees: dict[str, Any],
-) -> list[str]:
-    """Alerts for git state that rots silently until someone trips over it.
-
-    Complements build_git_cleanup_report (prunable branches/worktrees) by
-    catching the three drift patterns that have actually bitten us:
-    forgotten stashes, detached-HEAD worktrees, and uncommitted files on
-    main (pipeline or pilot residuals leak here).
-    """
-    out: list[str] = []
-
-    try:
-        r = subprocess.run(
-            ["git", "stash", "list", "--format=%ct"],
-            cwd=repo_root, capture_output=True, text=True, check=False, timeout=5,
-        )
-        if r.returncode == 0 and r.stdout.strip():
-            now = time.time()
-            ages = [
-                now - int(line.strip())
-                for line in r.stdout.splitlines()
-                if line.strip().isdigit()
-            ]
-            ancient = sum(1 for a in ages if a > 7 * 86400)
-            stale = sum(1 for a in ages if a > 86400) - ancient
-            if ancient:
-                out.append(
-                    f"git hygiene: {ancient} stash(es) older than 7 days "
-                    "— inspect with `git stash list --date=relative` or drop"
-                )
-            elif stale:
-                out.append(
-                    f"git hygiene: {stale} stash(es) older than 24h "
-                    "— forgotten stashes become landmines"
-                )
-    except (OSError, subprocess.TimeoutExpired):
-        pass
-
-    detached_paths = [
-        wt.get("path")
-        for wt in (worktrees.get("worktrees") or [])
-        if wt.get("detached")
-    ]
-    if detached_paths:
-        shown = ", ".join(str(p) for p in detached_paths[:3] if p)
-        more = f" (+{len(detached_paths) - 3} more)" if len(detached_paths) > 3 else ""
-        out.append(
-            f"git hygiene: {len(detached_paths)} worktree(s) in detached HEAD"
-            + (f": {shown}{more}" if shown else "")
-        )
-
-    if (
-        worktree.get("ok")
-        and worktree.get("branch") == "main"
-        and worktree.get("dirty")
-    ):
-        counts = worktree.get("counts") or {}
-        total = counts.get("total") or 0
-        out.append(
-            f"git hygiene: {total} uncommitted file(s) on main "
-            "— pipeline/pilot residuals sometimes land here; verify before committing"
-        )
-
-    return out
-
-
-def _count_review_backfill_pending(repo_root: Path) -> dict[str, Any]:
-    chapters_root = repo_root / "docs" / "research" / "ai-history" / "chapters"
-    pending: list[str] = []
-    for status_path in sorted(chapters_root.glob("ch-*/status.yaml")):
-        try:
-            text = status_path.read_text(encoding="utf-8")
-        except OSError:
-            continue
-        if re.search(r"(?m)^  backfill_pending: true$", text):
-            pending.append(status_path.parent.name)
-    return {"count": len(pending), "chapters": pending[:5]}
-
-
-def build_session_briefing(repo_root: Path) -> dict[str, Any]:
-    """Compact control-plane snapshot for agent orientation.
-
-    Target: ≤ 2K tokens. Designed to be the *first* call a fresh agent
-    makes, replacing the usual ``cat STATUS.md + git log + ls`` crawl.
-    See issue #258.
-    """
-    status_md = _parse_status_md(_live_status_path(repo_root))
-    worktree = build_worktree_status(repo_root)
-    worktrees = build_worktrees_list(repo_root)
-    services = build_runtime_services_status(repo_root)
-    commits = _recent_commits(repo_root, limit=5)
-    pipeline = _pipeline_summary_safe(repo_root)
-    review_backfill = _count_review_backfill_pending(repo_root)
-
-    alerts: list[str] = []
-    if services.get("stale", 0):
-        alerts.append(f"{services['stale']} stale pid file(s) — process exited without cleanup")
-    if isinstance(pipeline, dict) and "error" in pipeline:
-        alerts.append(f"pipeline v2 status unavailable: {pipeline['error']}")
-
-    # Phase C: surface stuck pipeline jobs and critical rubric scores so
-    # agents see high-signal issues without polling additional endpoints.
-    try:
-        stuck = build_pipeline_stuck(repo_root)
-    except Exception:  # noqa: BLE001
-        stuck = None
-    if isinstance(stuck, dict) and stuck.get("exists"):
-        leased = stuck.get("stuck_leased_count", 0)
-        in_state = stuck.get("stuck_in_state_count", 0)
-        dead_letter_stuck = stuck.get("dead_lettered_count", 0)
-        stale_worker_count = stuck.get("stale_workers_count", 0)
-        if leased:
-            alerts.append(f"{leased} job(s) with expired/stale lease — worker may have crashed")
-        if in_state:
-            alerts.append(f"{in_state} job(s) stuck in-flight with no recent event")
-        if dead_letter_stuck:
-            alerts.append(
-                f"{dead_letter_stuck} module(s) dead-lettered (unresolved) — need human triage"
-            )
-        if stale_worker_count:
-            alerts.append(
-                f"{stale_worker_count} worker(s) holding leases but silent — possible zombie"
-            )
-
-    try:
-        quality = build_quality_scores(repo_root)
-    except Exception:  # noqa: BLE001
-        quality = None
-    try:
-        reviews = build_reviews_index(repo_root, fact_check_status="unverified")
-    except Exception:  # noqa: BLE001
-        reviews = None
-    critical_quality: list[str] = []
-    if isinstance(quality, dict) and quality.get("exists"):
-        if quality.get("critical_count"):
-            alerts.append(
-                f"{quality['critical_count']} module(s) at critical rubric score (<2.0)"
-            )
-        critical_quality = [
-            f"{m['module']} [{m['track']}] score {m['score']}"
-            for m in (quality.get("critical") or [])[:5]
-        ]
-    if isinstance(reviews, dict) and reviews.get("count"):
-        alerts.append(f"{reviews['count']} module(s) with unverified fact claims")
-
-    # Git hygiene rot: only alert when the pile crosses a threshold, so
-    # the single-leftover worktree after a merge doesn't spam the panel.
-    try:
-        cleanup = build_git_cleanup_report(repo_root)
-        cb = cleanup.get("counts", {}).get("branches", 0)
-        cw = cleanup.get("counts", {}).get("worktrees", 0)
-        if cleanup.get("blockers"):
-            alerts.append(f"git hygiene inventory unavailable: {', '.join(cleanup['blockers'])}")
-        if cb >= 5 or cw >= 2:
-            alerts.append(
-                f"git hygiene: {cb} branch and {cw} worktree candidate(s) for review "
-                "— review /api/git/cleanup and preserve ignored artifacts"
-            )
-    except Exception:
-        logging.getLogger(__name__).debug("Git cleanup report unavailable", exc_info=True)
-
-    try:
-        alerts.extend(_git_hygiene_signals(repo_root, worktree, worktrees))
-    except Exception:
-        logging.getLogger(__name__).debug("Git hygiene signals unavailable", exc_info=True)
-
-    # Action-oriented triage lists. Agents ask "what should I touch"
-    # not "what's the global state"; the lists below answer that in
-    # the same call as the briefing.
-    #
-    # ``active``  — what is CURRENTLY owned / in flight. Read-only from
-    #               a deciding-agent's view; you don't grab these.
-    # ``blocked`` — things the pipeline can't make progress on without
-    #               a human or a re-enqueue.
-    # ``next``    — things ready to pick up right now.
-    #
-    # Structured row shape per ``action_rows[]``:
-    #   ``{bucket, label, module_key, phase, reason, endpoint}``
-    # The dashboard reads this directly. Agents that want the old flat
-    # list view still get ``actions.{active,blocked,next}`` (derived
-    # from ``action_rows`` below) plus ``top_modules[]``, both preserved
-    # for backward compat.
-    action_rows: list[dict[str, Any]] = []
-    top_modules: list[dict[str, Any]] = []
-
-    def _add_row(
-        bucket: str,
-        label: str,
-        *,
-        module_key: str | None = None,
-        phase: str | None = None,
-        reason: str | None = None,
-        endpoint: str | None = None,
-    ) -> None:
-        action_rows.append({
-            "bucket": bucket,
-            "label": label,
-            "module_key": module_key,
-            "phase": phase,
-            "reason": reason,
-            "endpoint": endpoint,
-        })
-        # ``top_modules[]`` keeps its historical shape (module_key may
-        # be None for repo-level rows like ``ready_queue``).
-        if reason and endpoint:
-            top_modules.append({
-                "module_key": module_key,
-                "phase": phase,
-                "reason": reason,
-                "endpoint": endpoint,
-            })
-
-    try:
-        leases = build_pipeline_leases(repo_root)
-    except Exception:  # noqa: BLE001
-        leases = None
-    if isinstance(leases, dict) and leases.get("exists"):
-        for lease in (leases.get("active") or [])[:5]:
-            secs = lease.get("seconds_to_expiry")
-            mk = lease.get("module_key")
-            _add_row(
-                "active",
-                f"{lease.get('leased_by','?')} → {mk or '?'} "
-                f"({lease.get('phase','?')}, {secs}s left)",
-                module_key=mk,
-                phase=lease.get("phase"),
-                reason="active_lease",
-                endpoint=f"/api/module/{mk}/state" if mk else None,
-            )
-
-    if isinstance(stuck, dict) and stuck.get("exists"):
-        for job in (stuck.get("stuck_leased") or [])[:5]:
-            mk = job.get("module_key")
-            _add_row(
-                "blocked",
-                f"{mk or '?'} stale lease (held by {job.get('leased_by','?')})",
-                module_key=mk,
-                phase=job.get("phase"),
-                reason="stale_lease",
-                endpoint=f"/api/pipeline/v2/events?module={mk}" if mk else None,
-            )
-        for job in (stuck.get("stuck_in_state") or [])[:5]:
-            mk = job.get("module_key")
-            _add_row(
-                "blocked",
-                f"{mk or '?'} stuck in {job.get('queue_state','?')}",
-                module_key=mk,
-                phase=job.get("phase"),
-                reason="stuck_in_state",
-                endpoint=f"/api/pipeline/v2/events?module={mk}" if mk else None,
-            )
-
-    if isinstance(reviews, dict) and reviews.get("exists"):
-        for review in (reviews.get("reviews") or [])[:5]:
-            mk = review.get("module_key")
-            _add_row(
-                "blocked",
-                f"{mk or '?'} has unverified fact claim",
-                module_key=mk,
-                reason="fact_check_unverified",
-                endpoint=f"/api/reviews?module={mk}" if mk else None,
-            )
-
-    if isinstance(pipeline, dict) and pipeline.get("queue_head"):
-        queue_head = pipeline["queue_head"] or {}
-        ready = int(queue_head.get("ready") or 0)
-        if ready:
-            _add_row(
-                "next",
-                f"{ready} job(s) ready to pick up in pipeline v2",
-                reason="ready_queue",
-                endpoint="/api/pipeline/v2/status",
-            )
-        dead_letter = int(queue_head.get("dead_letter") or 0)
-        if dead_letter:
-            _add_row(
-                "blocked",
-                f"{dead_letter} job(s) in dead-letter — needs human or re-enqueue",
-                reason="pipeline_dead_letter",
-                endpoint="/api/pipeline/v2/stuck",
-            )
-
-    if review_backfill["count"]:
-        _add_row(
-            "next",
-            f"{review_backfill['count']} AI History chapter(s) need review backfill",
-            reason="ai_history_review_backfill",
-            endpoint="docs/research/ai-history/REVIEW_COVERAGE.md",
-        )
-
-    actions_active = [r["label"] for r in action_rows if r["bucket"] == "active"]
-    actions_blocked = [r["label"] for r in action_rows if r["bucket"] == "blocked"]
-    actions_next = [r["label"] for r in action_rows if r["bucket"] == "next"]
-
-    return {
-        "snapshot": {
-            "generated_at": time.time(),
-            "generator": "local_api.build_session_briefing",
-            "version": 1,
-        },
-        "content_coverage": _content_coverage_report(repo_root, compact=True),
-        "workspace": {
-            "primary_branch": worktree.get("branch") if worktree.get("ok") else None,
-            "dirty": worktree.get("dirty") if worktree.get("ok") else None,
-            "counts": worktree.get("counts") if worktree.get("ok") else None,
-            "ahead": worktree.get("ahead") if worktree.get("ok") else None,
-            "behind": worktree.get("behind") if worktree.get("ok") else None,
-            "worktrees_total": worktrees.get("count", 0),
-            "worktrees": [
-                {
-                    "path": wt.get("path"),
-                    "branch": wt.get("branch"),
-                    "detached": wt.get("detached", False),
-                }
-                for wt in (worktrees.get("worktrees") or [])
-            ],
-        },
-        "services": {
-            "running": services["running"],
-            "stopped": services["stopped"],
-            "stale": services["stale"],
-            "total": services["total"],
-        },
-        "pipelines": {"v2": pipeline},
-        "recent_commits": commits,
-        "focus": status_md.get("focus", []),
-        "blockers": status_md.get("blockers", []),
-        "alerts": alerts,
-        "critical_quality": critical_quality,
-        "review_backfill": review_backfill,
-        "actions": {
-            # ``active`` — currently owned / in flight (read-only).
-            # ``blocked`` — needs human or re-enqueue.
-            # ``next`` — ready to pick up.
-            "active": actions_active,
-            "blocked": actions_blocked,
-            "next": actions_next,
-        },
-        # Structured twin of ``actions.*``. Each row has {bucket,
-        # label, module_key, phase, reason, endpoint}. Dashboards and
-        # UI consumers read this directly — scanning ``label`` strings
-        # to infer drill-down endpoints is fragile and misroutes when
-        # the same module appears in multiple buckets (Codex Phase D
-        # review round 3).
-        "action_rows": action_rows,
-        "top_modules": top_modules,
-        "next_reads": [
-            {"rel": "schema", "endpoint": "/api/schema", "desc": "Full endpoint index"},
-            {"rel": "status", "endpoint": "/api/status/summary", "desc": "Full repo status"},
-            {"rel": "pipeline", "endpoint": "/api/pipeline/v2/status", "desc": "Pipeline v2 queue"},
-            {"rel": "translation", "endpoint": "/api/translation/v2/status", "desc": "UK translation queue"},
-            {"rel": "services", "endpoint": "/api/runtime/services", "desc": "Runtime pids / ports"},
-            {"rel": "worktrees", "endpoint": "/api/git/worktrees", "desc": "All attached worktrees"},
-            {"rel": "module-state", "endpoint": "/api/module/{key}/state", "desc": "Per-module EN+UK+lab+frontmatter"},
-            {"rel": "module-orchestration", "endpoint": "/api/module/{key}/orchestration/latest", "desc": "Per-module latest pipeline job/event"},
-        ],
-        "links": {
-            "status_md": "STATUS.md",
-            "claude_md": "CLAUDE.md",
-            "dashboard": "/",
-        },
-    }
-
-
-def _compact_briefing(briefing: dict[str, Any]) -> dict[str, Any]:
-    """Drop fields that aren't actionable for agents to shave tokens further.
-
-    Keeps ``actions`` and ``top_modules`` — those are THE actionable
-    fields — and drops navigation aids (``next_reads``, ``links``) and
-    the full worktrees list (``worktrees_total`` is enough).
-    """
-    compact = dict(briefing)
-    compact.pop("next_reads", None)
-    compact.pop("links", None)
-    if "workspace" in compact and isinstance(compact["workspace"], dict):
-        ws = dict(compact["workspace"])
-        ws.pop("worktrees", None)
-        compact["workspace"] = ws
-    return compact
-
-
-def build_orient(repo_root: Path) -> dict[str, Any]:
-    """Maximum-signal, minimum-token orientation: what to do RIGHT NOW.
-
-    Projects the session briefing into a single ``primary`` action +
-    up to 3 ``alternatives`` + raw ``blockers`` / ``alerts``. Reach for
-    ``/api/briefing/session?compact=1`` when the full snapshot is needed.
-    """
-    briefing, freshness = get_or_build_session_briefing(repo_root)
-    rows = briefing.get("action_rows") or []
-    blockers = briefing.get("blockers") or []
-    alerts = briefing.get("alerts") or []
-    workspace = briefing.get("workspace") or {}
-    snapshot = briefing.get("snapshot") or {}
-
-    def _row_to_action(row: dict[str, Any]) -> dict[str, Any]:
-        return {
-            "action": row.get("bucket") or "next",
-            "headline": row.get("label"),
-            "module_key": row.get("module_key"),
-            "endpoint": row.get("endpoint"),
-            "reason": row.get("reason"),
-            "phase": row.get("phase"),
-        }
-
-    if rows:
-        primary = _row_to_action(rows[0])
-        alternatives = [_row_to_action(r) for r in rows[1:4]]
-    else:
-        primary = {
-            "action": "idle",
-            "headline": "queue empty — propose work or check blockers for unblock candidates",
-            "module_key": None,
-            "endpoint": None,
-            "reason": None,
-            "phase": None,
-        }
-        alternatives = []
-
-    return {
-        "version": 1,
-        "primary": primary,
-        "alternatives": alternatives,
-        "blockers": blockers,
-        "alerts": alerts,
-        "workspace_dirty": bool(workspace.get("dirty")),
-        "freshness_state": (freshness or {}).get("freshness_state"),
-        "generated_at": snapshot.get("generated_at"),
-    }
-
-
-# Registry keyed by resolved ``repo_root`` so multiple repos sharing one
-# Python process (test suite, multi-repo servers) never cross-contaminate.
-_SESSION_BRIEFING_SNAPSHOTS: dict[str, BackgroundSnapshot] = {}
-_SESSION_BRIEFING_SNAPSHOT_LOCK = threading.Lock()
-
-
-def get_or_build_session_briefing(repo_root: Path) -> tuple[dict[str, Any], dict[str, Any]]:
-    """Return (briefing, freshness_meta). Uses a background snapshot so
-    the briefing endpoint is always cheap."""
-    key = str(repo_root.resolve())
-    with _SESSION_BRIEFING_SNAPSHOT_LOCK:
-        snap = _SESSION_BRIEFING_SNAPSHOTS.get(key)
-        if snap is None:
-            snap = _register_snapshot(
-                f"briefing_session::{key}",
-                interval_seconds=15.0,
-                builder=lambda: build_session_briefing(repo_root),
-            )
-            # Prime synchronously on the first request so the first caller
-            # sees real data instead of ``freshness_state=refreshing``.
-            snap.refresh_blocking()
-            snap.start()
-            _SESSION_BRIEFING_SNAPSHOTS[key] = snap
-    payload, freshness = snap.get()
-    if payload is None:
-        # Degraded path — build synchronously once.
-        payload = build_session_briefing(repo_root)
-    return payload, freshness
-
-
 # ---- /api/schema ----
 
 
 def build_api_schema() -> dict[str, Any]:
-    """Machine-readable endpoint index. Lets agents discover the API
-    without reading this 1.7K-LOC file."""
+    """Machine-readable endpoint index for the KubeDojo local API."""
     return {
         "version": 1,
         "conventions": {
             "errors": 'JSON envelope: {"error": "<code>", ...optional context}.',
             "cache": "Weak ETag returned on cacheable responses; send If-None-Match to get 304.",
-            "compact": "/api/briefing/session supports ?compact=1 to drop non-actionable fields.",
-            "freshness": "Background-refreshed endpoints embed a 'freshness' dict with freshness_state and stale_seconds.",
         },
         "endpoints": [
             {"path": "/", "desc": "Visual curriculum progress and recorded work overview", "content_type": "text/html"},
@@ -7214,61 +5366,22 @@ def build_api_schema() -> dict[str, Any]:
             {"path": "/api/schema", "desc": "This document"},
             {
                 "path": "/api/state/manifest",
-                "desc": "Pointer-only cold-start state index grouped by purpose",
-                "content_type": "application/json",
-            },
-            {
-                "path": "/api/orient",
-                "desc": "Single primary action + up to 3 alternatives + blockers/alerts. Punch-line orientation derived from the session briefing.",
+                "desc": "Pointer-only local API index grouped by purpose",
                 "content_type": "application/json",
             },
             {"path": "/api/artifacts", "desc": "JSON index of HTML and Markdown artifacts served by /artifacts. Research category omitted by default for performance; opt in with ?include=research or ?include_research=1.", "query": ["include=research", "include_research=1"]},
-            {
-                "path": "/api/briefing/session",
-                "desc": "Agent cold-start orientation snapshot. First call for fresh agents.",
-                "query": ["compact=1"],
-                "freshness": "background-refreshed every 15s",
-            },
-            {
-                "path": "/api/session/current",
-                "desc": "Latest session handoff with render/raw URLs plus up to 10 predecessors",
-                "content_type": "application/json",
-            },
             {
                 "path": "/api/briefing/book",
                 "desc": "AI-history book chapter status rollup. Scans chapters/ch-NN-*/status.yaml and groups by Part (1-9). Each part includes status_rollup, owners_seen, tracking_issue, and a per-chapter list with Green/Yellow/Red counts when present.",
             },
             {"path": "/api/status/summary", "desc": "Repo status (fast)"},
             {"path": "/api/missing-modules/status", "desc": "Modules missing from nav/sidebar"},
-            {"path": "/api/activity/recent", "desc": "Recent commits, pipeline events, bridge messages, watched issue (grouped by source)"},
-            {
-                "path": "/api/activity",
-                "desc": "Merged chronological feed (commits + pipeline events + bridge messages), newest-first",
-                "query": [
-                    "since=<Unix-epoch seconds | ISO-8601> (default: 24 h ago)",
-                    "limit=... (default 50, max 500)",
-                ],
-            },
             {"path": "/api/navigation/status", "desc": "Top-level route coverage and candidate-stale index pages"},
             {"path": "/api/delivery/status", "desc": "Build freshness and site-health status"},
             {"path": "/api/content/coverage", "desc": "All-page review records by locale, track and section; records are not exhaustive clearance"},
             {
                 "path": "/api/tracks/readiness",
                 "desc": "Legacy frontmatter flags plus bound source counts; use /api/content/coverage for page reviews",
-            },
-            {
-                "path": "/api/runtime/services",
-                "desc": "Runtime services (pids, uptime, ports) plus repo-root inspection.",
-                "fields": ["running", "stopped", "stale", "total", "services", "repo"],
-                "repo": {
-                    "fields": ["repo_root", "primary_repo_root", "process_cwd", "warnings"],
-                    "desc": (
-                        "inspect_repo_root() output: repo_root is the served checkout; "
-                        "primary_repo_root is git common-dir parent (null when git unavailable); "
-                        "process_cwd is os.getcwd(); warnings when repo_root != primary, "
-                        "cwd is under .worktrees/, or .pids/api.pid is stale/unreadable."
-                    ),
-                },
             },
             {"path": "/api/build/run", "desc": "Spawn `npm run build` in the background", "method": "POST"},
             {"path": "/api/build/status", "desc": "Build job status + tail + warning diff", "query": ["job_id=..."]},
@@ -7285,18 +5398,6 @@ def build_api_schema() -> dict[str, Any]:
             },
             {"path": "/api/labs/status", "desc": "Labs summary"},
             {"path": "/api/ztt/status", "desc": "Zero-to-Terminal pilot status"},
-            {"path": "/api/git/worktree", "desc": "Dirty entries in the PRIMARY repo only"},
-            {"path": "/api/git/worktrees", "desc": "All attached worktrees (plural)"},
-            {"path": "/api/git/cleanup", "desc": "Read-only merged branch and worktree review inventory; preserve ignored artifacts."},
-            {
-                "path": "/api/gh/issues",
-                "desc": "Cached GitHub issue list for agent orientation",
-                "query": ["state=open|closed|all (default open)", "limit=... (default 50, max 200)"],
-            },
-            {
-                "path": "/api/gh/issues/{n}",
-                "desc": "Single GitHub issue with the last 5 comments",
-            },
             {"path": "/api/issue-watch/{n}", "desc": "Single watched GH issue state"},
             {"path": "/api/module/{key}/state", "desc": "Per-module EN+UK+lab+frontmatter+diagnostics"},
             {"path": "/api/module/{key}/orchestration/latest", "desc": "Per-module latest pipeline job+event"},
@@ -7426,7 +5527,7 @@ def route_request(repo_root: Path, raw_path: str) -> tuple[int, Any, str]:
             limit=limit_val,
         ), "application/json; charset=utf-8"
     if path == "/healthz":
-        return 200, _repo_guard_module().build_healthz_payload(repo_root), "application/json; charset=utf-8"
+        return 200, _build_healthz_payload(repo_root), "application/json; charset=utf-8"
     if path == "/api/artifacts":
         return 200, _get_artifacts_index(repo_root, query), "application/json; charset=utf-8"
     if path == "/api/status/summary":
@@ -7438,29 +5539,6 @@ def route_request(repo_root: Path, raw_path: str) -> tuple[int, Any, str]:
     if path == "/api/missing-modules/status":
         from status import _build_missing_modules_summary
         return 200, _build_missing_modules_summary(repo_root), "application/json; charset=utf-8"
-    if path == "/api/activity/recent":
-        return 200, build_recent_activity(repo_root), "application/json; charset=utf-8"
-    if path == "/api/activity":
-        since_raw = query.get("since", [None])[0]
-        since_seconds: int | None = None
-        if since_raw:
-            try:
-                # Accept epoch seconds...
-                since_seconds = int(since_raw)
-            except (TypeError, ValueError):
-                # ...or an ISO-8601 timestamp.
-                since_seconds = _iso_to_epoch(since_raw)
-                if since_seconds is None:
-                    return 400, {"error": "invalid_since"}, "application/json; charset=utf-8"
-        try:
-            limit = int(query.get("limit", ["50"])[0])
-        except (TypeError, ValueError):
-            limit = 50
-        return (
-            200,
-            build_activity_feed(repo_root, since_seconds=since_seconds, limit=limit),
-            "application/json; charset=utf-8",
-        )
     if path == "/api/navigation/status":
         return 200, build_navigation_status(repo_root), "application/json; charset=utf-8"
     if path == "/api/delivery/status":
@@ -7469,8 +5547,6 @@ def route_request(repo_root: Path, raw_path: str) -> tuple[int, Any, str]:
         return 200, build_tracks_readiness(repo_root), "application/json; charset=utf-8"
     if path == "/api/content/coverage":
         return 200, _content_coverage_report(repo_root), "application/json; charset=utf-8"
-    if path == "/api/runtime/services":
-        return 200, build_runtime_services_status(repo_root), "application/json; charset=utf-8"
     if path == "/api/build/status":
         job_id = query.get("job_id", [None])[0]
         if not job_id:
@@ -7522,43 +5598,10 @@ def route_request(repo_root: Path, raw_path: str) -> tuple[int, Any, str]:
     if path == "/api/ztt/status":
         from ztt_status import build_status as build_ztt_status
         return 200, build_ztt_status(repo_root), "application/json; charset=utf-8"
-    if path == "/api/git/worktree":
-        return 200, build_worktree_status(repo_root), "application/json; charset=utf-8"
-    if path == "/api/git/worktrees":
-        return 200, build_worktrees_list(repo_root), "application/json; charset=utf-8"
-    if path == "/api/git/cleanup":
-        return 200, build_git_cleanup_report(repo_root), "application/json; charset=utf-8"
-    if path == "/api/gh/issues":
-        state = query.get("state", ["open"])[0] or "open"
-        if state not in {"open", "closed", "all"}:
-            state = "open"
-        try:
-            limit = int(query.get("limit", ["50"])[0])
-        except (TypeError, ValueError):
-            limit = 50
-        return _build_gh_list("issue", state, max(1, min(limit, 200)))
-    if path.startswith("/api/gh/issues/"):
-        try:
-            number = int(path.split("/")[-1])
-        except ValueError:
-            return 400, {"error": "invalid_issue_number"}, "application/json; charset=utf-8"
-        return _build_gh_detail("issue", number)
     if path == "/api/schema":
         return 200, build_api_schema(), "application/json; charset=utf-8"
     if path == "/api/state/manifest":
         return 200, build_state_manifest(), "application/json; charset=utf-8"
-    if path == "/api/briefing/session":
-        compact = query.get("compact", ["0"])[0] not in ("0", "false", "")
-        briefing, freshness = get_or_build_session_briefing(repo_root)
-        briefing = dict(briefing)
-        briefing["freshness"] = freshness
-        if compact:
-            briefing = _compact_briefing(briefing)
-        return 200, briefing, "application/json; charset=utf-8"
-    if path == "/api/orient":
-        return 200, build_orient(repo_root), "application/json; charset=utf-8"
-    if path == "/api/session/current":
-        return 200, build_current_session(repo_root), "application/json; charset=utf-8"
     if path == "/api/briefing/book":
         return 200, build_book_briefing(repo_root), "application/json; charset=utf-8"
     if path == "/api/cache/stats":
@@ -7792,21 +5835,17 @@ def _v_docs_frontmatter(repo_root: Path) -> tuple:
     return ("docs-frontmatter", sig.hexdigest())
 
 
-# Map fixed paths (query-independent beyond ``?compact=1``) to policies.
-# (ttl_seconds, version_fn_or_None)
+# Map fixed paths to caching policies: (ttl_seconds, version_fn_or_None).
 CACHE_POLICY: dict[str, tuple[float, Callable[[Path], tuple] | None]] = {
     "/healthz": (60.0, None),
     "/artifacts": (30.0, None),
     "/api/artifacts": (30.0, None),
     "/api/schema": (600.0, None),
     "/api/state/manifest": (600.0, None),
-    "/api/session/current": (30.0, None),
     "/api/status/summary": (10.0, _v_v2_db),
     "/api/missing-modules/status": (30.0, None),
-    "/api/activity/recent": (5.0, _v_v2_db),
     "/api/navigation/status": (30.0, None),
     "/api/delivery/status": (30.0, None),
-    "/api/runtime/services": (2.0, None),
     "/api/pipeline/v2/status": (5.0, _v_v2_db),
     "/api/translation/v2/status": (5.0, _v_translation_db),
     "/api/labs/status": (10.0, None),
@@ -7816,11 +5855,6 @@ CACHE_POLICY: dict[str, tuple[float, Callable[[Path], tuple] | None]] = {
     "/api/tracks/readiness": (5.0, _v_docs_frontmatter),
     "/api/citations/status": (30.0, None),
     "/api/ztt/status": (30.0, None),
-    "/api/git/worktree": (2.0, None),
-    "/api/git/worktrees": (5.0, None),
-    "/api/git/cleanup": (10.0, None),
-    "/api/briefing/session": (5.0, None),  # background-refreshed; TTL just caps rebuild rate
-    "/api/orient": (5.0, None),  # cheap projection over the same background-refreshed briefing
 }
 
 
@@ -7855,20 +5889,6 @@ def serve_request(
     parsed = urlsplit(raw_path)
     path = parsed.path.rstrip("/") or "/"
     query = parse_qs(parsed.query)
-
-    if _is_gh_path(path):
-        cache_key = _normalized_cache_key(path, query, repo_root=repo_root)
-
-        def _build() -> tuple[int, Any, str]:
-            return route_request(repo_root, raw_path)
-
-        return cached_response(
-            cache_key,
-            GH_CACHE_TTL_SECONDS,
-            lambda: ("gh",),
-            _build,
-            lambda payload, _body: _gh_payload_etag(path, payload),
-        )
 
     policy = CACHE_POLICY.get(path)
     if policy is not None:
@@ -8023,7 +6043,7 @@ def make_handler(repo_root: Path) -> type[BaseHTTPRequestHandler]:
 
 
 def serve(repo_root: Path, host: str, port: int) -> None:
-    inspection = _repo_guard_module().inspect_repo_root(repo_root)
+    inspection = _inspect_repo_root(repo_root)
     for warning in inspection.get("warnings", []):
         if isinstance(warning, str):
             print(warning, file=sys.stderr)

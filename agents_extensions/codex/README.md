@@ -17,11 +17,6 @@ A differing unowned config blocks deployment. Keep personal preferences
 in your home config and use the [migration steps](../README.md#existing-checkouts)
 if the deployer reports a conflicting project file.
 
-`start-codex.sh` also enables v2 explicitly. Set `CODEX_ENABLE_MULTI_AGENT=0`
-to disable both multi-agent and v2 for that launch, even if project config
-enables them. Other Codex arguments are forwarded unchanged; avoid conflicting
-feature flags and use the wrapper opt-out for a single-agent launch.
-
 The runtime reads final answers only from each invocation's unique `-o` file.
 It does not recover answers or terminate a process based on shared rollout
 files. A CLI hang therefore waits for the configured hard timeout; missing

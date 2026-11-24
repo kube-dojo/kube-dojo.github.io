@@ -93,7 +93,8 @@ def test_manifest_lists_primary_screens_and_actual_legacy_redirects(tmp_path: Pa
         assert status == 302 and dashboards[route]['type'] == 'redirect'
         assert dashboards[route]['target'] == target
     diagnostic_apis = {entry['path'] for entry in categories['git_and_build'] if entry['type'] == 'api'}
-    assert {'/api/git/worktrees', '/api/missing-modules/status'} <= diagnostic_apis
+    assert {'/api/missing-modules/status', '/api/build/status'} <= diagnostic_apis
+    assert '/api/git/worktrees' not in diagnostic_apis
 
 
 def test_all_monitor_entry_points_share_the_app_nav_and_no_search(tmp_path: Path) -> None:
