@@ -90,36 +90,62 @@ def _module_path_for_marker(module_path: str) -> str:
     return normalized
 
 
+def _crosses_local_symlink(rel: Path) -> bool:
+    """True when a component of ``rel`` that exists in this checkout is a symlink."""
+    current = REPO
+    for part in rel.parts:
+        current = current / part
+        if os.path.islink(current):
+            return True
+        if not os.path.lexists(current):
+            return False
+    return False
+
+
 def repo_relative_module(module_path: str) -> str | None:
     """The queue entry as a validated ``src/content/docs/...`` path, or ``None``.
 
     Queue rows may name a module relative to the repository or absolutely
-    under this checkout or the primary one. Everything downstream (the writer
-    prompt, the commit check in the module worktree, source acceptance) uses
-    the one repository-relative form; anything else is refused.
+    under this checkout or the primary one. An absolute entry must resolve
+    strictly (every component exists, symlinks followed, no loop) to a
+    regular file inside one of the two checkouts. A relative entry that
+    exists in this checkout gets the same treatment (so a symlink cannot
+    lead outside the checkout); one that does not exist here is kept as
+    written, because the module worktree is created from ``origin/main``.
+    The canonical repository-relative string is validated last, whichever
+    form came in: no NUL, encodable as UTF-8, no ``..``, a
+    ``src/content/docs/...md`` path. Everything downstream (budget sidecar,
+    writer prompt, commit check in the module worktree, source acceptance)
+    uses that one string; any failure is ``None``, which the caller turns
+    into a per-row skip.
     """
-    if "\0" in module_path:
-        return None
-    try:
-        module_path.encode("utf-8")  # a lone surrogate names no portable file
-    except UnicodeEncodeError:
-        return None
     path = Path(module_path)
     if ".." in path.parts:
         return None
-    if path.is_absolute():
-        try:
-            resolved = path.resolve()  # a symlinked spelling of either checkout
-            roots = (REPO.resolve(), PRIMARY_REPO.resolve())  # this checkout first: it is nested in the primary
-        except (OSError, RuntimeError, ValueError):  # e.g. a symlink loop (RuntimeError before Python 3.13)
-            return None
-        for root in roots:
+    try:
+        candidate = path if path.is_absolute() else REPO / path
+        local = path.is_absolute() or os.path.lexists(candidate) or _crosses_local_symlink(path)
+        if local:
+            resolved = candidate.resolve(strict=True)  # symlinks followed; a loop raises
+            if not resolved.is_file():
+                return None
+            roots = (REPO.resolve(strict=True), PRIMARY_REPO.resolve(strict=True))
+    except (OSError, RuntimeError, ValueError):  # missing, loop (RuntimeError before 3.13), NUL
+        return None
+    if local:
+        for root in roots:  # this checkout first: it is nested in the primary
             if resolved.is_relative_to(root):
                 path = resolved.relative_to(root)
                 break
         else:
             return None
     rel = path.as_posix()
+    try:
+        rel.encode("utf-8")  # a lone surrogate (or a resolved non-UTF-8 name) is not portable
+    except UnicodeEncodeError:
+        return None
+    if "\0" in rel or ".." in Path(rel).parts:
+        return None
     if not rel.startswith("src/content/docs/") or not rel.endswith(".md"):
         return None
     return rel
