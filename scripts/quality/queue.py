@@ -41,23 +41,31 @@ from .state import (
 # neither resolves, default to tertiary so a human picks instead of silently
 # routing to whichever the order ended up.
 
-# Primary writer is now the agy (Antigravity) Google lane, model
-# gemini-3.1-pro-high — gemini-cli is retired (#2125). The model id is an agy
-# display slug, dispatched via the `agy` subcommand in scripts/dispatch.py.
-PRIMARY_BEGINNER = "gemini-3.1-pro-high"
-PRIMARY_ADVANCED = "gemini-3.1-pro-high"
+# Primary writer is the agy (Antigravity) Google lane at the pro tier —
+# gemini-cli is retired (#2125). The model id is an agy slug that the
+# lu-machinery model catalog admits.
+PRIMARY_BEGINNER = "gemini-4-neon-high"
+PRIMARY_ADVANCED = "gemini-4-neon-high"
 TERTIARY = "claude-opus-5-5"
 
 # Map writer-model identifiers (returned by route_writer / stored in the
 # queue doc) onto the (agent, model) tuple that ``dispatchers.dispatch``
 # expects. Kept here, not in dispatchers.py, so the queue owns the
-# vocabulary. Adding a writer means adding an entry here AND a
-# corresponding case in scripts/dispatch.py.
+# vocabulary. Adding a writer means adding an entry here.
 _MODEL_TO_AGENT: dict[str, tuple[str, str]] = {
     PRIMARY_BEGINNER: ("agy", PRIMARY_BEGINNER),
     TERTIARY: ("claude", TERTIARY),
-    # Queue rows recorded before Opus 5.5 became the default still resolve.
+    # Queue rows record the id their slot held when they were routed. Every id
+    # a slot has ever held (git history of PRIMARY_BEGINNER, PRIMARY_ADVANCED
+    # and TERTIARY) resolves to the slot's current holder: the documented
+    # successor, never a guess. Any other id stays unknown and is refused.
+    "claude-opus-4-7": ("claude", TERTIARY),
     "claude-opus-4-8": ("claude", TERTIARY),
+    "gemini-3.1-pro-preview": ("agy", PRIMARY_BEGINNER),
+    "gemini-3.1-pro-high": ("agy", PRIMARY_BEGINNER),
+    # gpt-5.5 held PRIMARY_ADVANCED until the advanced slot moved to the
+    # Google lane (dd33ad2ba); its successor is that slot's current holder.
+    "gpt-5.5": ("agy", PRIMARY_ADVANCED),
 }
 
 
@@ -128,7 +136,7 @@ def _tertiary_writer() -> str:
     """Resolve the tertiary writer, honouring a runtime degraded fallback.
     """
     fallback = os.environ.get("KUBEDOJO_TERTIARY_FALLBACK", "").lower().strip()
-    if fallback in {"gemini", "agy", "gemini-3.1-pro-preview", "gemini-3.1-pro-high"}:
+    if fallback in {"gemini", "agy", "gemini-3.1-pro-preview", "gemini-3.1-pro-high", "gemini-4-neon-high"}:
         return PRIMARY_BEGINNER
     return TERTIARY
 

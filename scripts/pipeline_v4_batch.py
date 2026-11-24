@@ -17,17 +17,9 @@ clamped with a warning. The lease coordination matters primarily
 across processes (resumable, crash-safe), not for within-process
 parallelism.
 
-**Gemini auth mode.** The Gemini CLI prefers GEMINI_API_KEY when set;
-otherwise it falls through to OAuth/subscription creds. When the
-API-key tier is on cooldown, prefix the batch run with
-`KUBEDOJO_GEMINI_SUBSCRIPTION=1` and dispatch will strip the key
-from child env so calls use the subscription path. See
-scripts/dispatch.py and scripts/ai_agent_bridge/_config.py — both
-dispatch entry points honor the switch.
-
 Usage:
     .venv/bin/python scripts/pipeline_v4_batch.py --track /ai --limit 5
-    KUBEDOJO_GEMINI_SUBSCRIPTION=1 .venv/bin/python scripts/pipeline_v4_batch.py \\
+    .venv/bin/python scripts/pipeline_v4_batch.py \\
         --track ai-ml-engineering/ai-infrastructure --limit 5
     .venv/bin/python scripts/pipeline_v4_batch.py --limit 1 --dry-run
 """

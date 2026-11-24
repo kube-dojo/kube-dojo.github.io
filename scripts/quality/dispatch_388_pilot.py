@@ -3,7 +3,7 @@
 
 For each module path in --input (default scripts/quality/pilot-2026-05-02.txt):
   1. Worktree at .worktrees/codex-388-pilot-<slug> from origin/main
-  2. Codex (gpt-5.5, mode=danger) rewrites per module-rewriter-388.md,
+  2. Codex (release default model, mode=danger) rewrites per module-rewriter-388.md,
      runs verifier, commits, pushes, opens PR
   3. Cross-family review on the PR (agy — the Google lane — with claude/qwen fallback)
   4. APPROVE       -> retain PR/review and hold for a real source-acceptance receipt
@@ -23,6 +23,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import posixpath
 import re
 import subprocess
 import sys
@@ -37,7 +38,11 @@ import yaml
 # checkout (primary OR a worktree) without a hard-coded absolute path.
 # scripts/quality/dispatch_388_pilot.py -> repo root is parents[2].
 REPO = Path(__file__).resolve().parents[2]
-PRIMARY_REPO = REPO.parent.parent if REPO.parent.name == ".worktrees" else REPO
+# The primary checkout: dispatch worktrees live anywhere under <primary>/.worktrees/
+# (for example .worktrees/dispatch/<agent>/<task>), as in the AI-History dispatchers.
+PRIMARY_REPO = (
+    Path(*REPO.parts[: REPO.parts.index(".worktrees")]) if ".worktrees" in REPO.parts else REPO
+)
 PILOT_FILE = REPO / "scripts/quality/pilot-2026-05-02.txt"
 LOG = REPO / "logs/388_pilot_2026-05-02.jsonl"
 BRIEF = REPO / "scripts/prompts/module-rewriter-388.md"
@@ -45,13 +50,14 @@ WRITER_BRIEF = REPO / "scripts/prompts/module-writer.md"
 VENV_PYTHON = PRIMARY_REPO / ".venv" / "bin" / "python"
 
 sys.path.insert(0, str(REPO / "scripts"))
-from agent_runtime.errors import (
+from lu_machinery.agent_runtime.errors import (
     AgentTimeoutError,
     AgentUnavailableError,
     RateLimitedError,
 )
-from agent_runtime.runner import invoke
-from lib.pr_merge import PrMergeError, merge_when_green
+from lu_machinery.agent_runtime.runner import invoke
+
+from quality.writer_commit import Snapshot, produced, select_product_root, snapshot
 
 
 def module_slug_for_pipeline(module_path: str) -> str:
@@ -83,6 +89,35 @@ def _module_path_for_marker(module_path: str) -> str:
     normalized = normalized.removeprefix("./")
     normalized = normalized.removeprefix("/")
     return normalized
+
+
+def repo_relative_module(module_path: str) -> str | None:
+    """The queue entry if it is already a canonical module path, else ``None``.
+
+    A queue row must name its module exactly as the repository does: a
+    relative ``src/content/docs/...md`` path with no ``.`` or ``..``
+    components, no empty, duplicate or trailing slashes, no backslash, NUL or
+    character that is not UTF-8. Nothing is normalized and nothing is looked
+    up on disk, so no spelling can stand for a different file: an absolute
+    path (it would point the writer at another checkout's copy) or any other
+    spelling is refused, and the caller skips the row with
+    ``module_path_not_canonical``. Everything downstream (budget sidecar,
+    writer prompt, commit check in the module worktree, source acceptance)
+    uses this one string.
+    """
+    if not module_path or "\0" in module_path or "\\" in module_path:
+        return None
+    try:
+        module_path.encode("utf-8")
+    except UnicodeEncodeError:
+        return None
+    if module_path.startswith("/") or posixpath.normpath(module_path) != module_path:
+        return None
+    if any(part in ("", ".", "..") for part in module_path.split("/")):
+        return None
+    if not module_path.startswith("src/content/docs/") or not module_path.endswith(".md"):
+        return None
+    return module_path
 
 
 def _module_budget_slug(module_path: str) -> str:
@@ -126,17 +161,22 @@ def _queue_from_file(input_file: Path) -> list[tuple[str, int | None]]:
         entries = _parse_yaml_queue(input_file.read_text(encoding="utf-8"))
         loaded: list[tuple[str, int | None]] = []
         for row in entries:
-            path = str(row["path"]).strip()
+            path = str(row["path"])  # validated as given: a padded spelling is not canonical
             budget_value = row.get("budget")
             if budget_value is None:
                 loaded.append((path, None))
                 continue
             loaded.append((path, int(budget_value)))
         return loaded
+    # Records are universal-newline lines: read_text() folds \r\n and \r into
+    # \n, and only \n splits. (str.splitlines() would also split on vertical
+    # tab, form feed, U+001C-U+001E, U+0085, U+2028 and U+2029 and so drop
+    # them from a row.) The rest of each line is validated as given, so a
+    # padded spelling is refused, not trimmed.
     return [
-        (line.strip(), None)
-        for line in input_file.read_text(encoding="utf-8").splitlines()
-        if line.strip() and not line.startswith("#")
+        (line, None)
+        for line in input_file.read_text(encoding="utf-8").split("\n")
+        if line.strip() and not line.lstrip().startswith("#")
     ]
 
 
@@ -164,9 +204,18 @@ def slugify(path: str) -> str:
     return module_slug_for_pipeline(path)
 
 
+def module_worktree(slug: str) -> Path:
+    """The isolated checkout the writer and every write-capable reviewer use.
+
+    The release refuses write-capable modes in the primary checkout, so
+    reviewer rungs that need danger or workspace-write run here too.
+    """
+    return REPO / f".worktrees/codex-388-pilot-{slug}"
+
+
 def make_worktree(slug: str, module_path: str) -> Path:
     branch = f"codex/388-pilot-{slug}"
-    wt = REPO / f".worktrees/codex-388-pilot-{slug}"
+    wt = module_worktree(slug)
     if wt.exists():
         marker = wt / ".module_path"
         if not marker.exists():
@@ -239,7 +288,7 @@ def dispatch_codex(module_path: str, wt: Path, slug: str):
             prompt=codex_prompt(module_path),
             mode="danger",
             cwd=wt,
-            model="gpt-5.5",
+            model=None,  # lu-machinery release default Codex model
             task_id=f"388-pilot-{slug}",
             entrypoint="dispatch",
             hard_timeout=5400,  # 90 min
@@ -310,6 +359,81 @@ def orchestrator_open_pr(slug: str, module_path: str, codex_response: str) -> in
     return pr_num
 
 
+REMOTE_TIMEOUT_S = 120
+
+
+def _published_branch_head(slug: str) -> tuple[bool, str | None]:
+    """``(looked_up, head)`` for the module's PR branch on GitHub.
+
+    ``(True, None)`` means the branch is confirmed absent; ``(False, None)``
+    means the lookup failed or timed out, so the published baseline is unknown.
+    """
+    try:
+        ls = subprocess.run(
+            ["git", "ls-remote", "--exit-code", "origin", f"refs/heads/codex/388-pilot-{slug}"],
+            cwd=REPO, capture_output=True, text=True, errors="replace", check=False,
+            timeout=REMOTE_TIMEOUT_S,
+        )
+    except subprocess.TimeoutExpired:
+        return False, None
+    if ls.returncode == 2:  # --exit-code: the remote answered and has no such ref
+        return True, None
+    fields = ls.stdout.split() if ls.returncode == 0 else []
+    return (True, fields[0]) if fields else (False, None)
+
+
+def writer_snapshot(wt: Path, slug: str) -> Snapshot | None:
+    """Pre-dispatch state for :func:`writer_committed_module`, or ``None``.
+
+    The worktree is reused across runs, so earlier output may sit on a local
+    branch, in a reflog or only on GitHub; all of it counts as prior output.
+    ``None`` means that baseline is unknown (the GitHub lookup failed or the
+    local read failed), and the module must not be dispatched.
+    """
+    looked_up, published = _published_branch_head(slug)
+    if not looked_up:
+        return None
+    before = snapshot(wt, "HEAD", prior_outputs=(published,))
+    return before if before.start is not None else None
+
+
+def writer_committed_module(wt: Path, module_path: str, before: Snapshot) -> tuple[bool, dict[str, str | None]]:
+    """True only when THIS writer run left new committed work on ``module_path``.
+
+    The lu-machinery runner returns a danger-mode success without checking
+    that the run produced anything, and an idle writer in a reused worktree
+    could otherwise hand back earlier output (or an existing PR URL) as its
+    own. :func:`quality.writer_commit.produced` decides; ``local_head`` in the
+    detail is the commit that was checked, and review must see exactly it.
+    """
+    local_head, reason = produced(wt, before, module_path, kind="file")
+    detail: dict[str, str | None] = {"head_before": before.start, "local_head": local_head}
+    if reason is not None:
+        return False, {**detail, "reason": reason}
+    return True, detail
+
+
+def published_head_matches(pr_num: int, wt: Path, checked_head: str | None) -> tuple[bool, dict[str, str | None]]:
+    """True only when the PR head on GitHub is the head whose module change was checked.
+
+    The release runner does not check that a new commit reached origin (the
+    fork's push check is gone), and a PR URL in the response skips the
+    fallback branch probe. Review must see the commit the writer made, so a
+    stale or unpublished head stops here.
+    """
+    try:
+        remote = subprocess.run(
+            ["gh", "pr", "view", str(pr_num), "--json", "headRefOid", "--jq", ".headRefOid"],
+            cwd=wt, capture_output=True, text=True, errors="replace", check=False,
+            timeout=REMOTE_TIMEOUT_S,
+        )
+        pr_head = remote.stdout.strip() if remote.returncode == 0 else None
+    except subprocess.TimeoutExpired:
+        pr_head = None
+    detail = {"local_head": checked_head, "pr_head": pr_head, "reason": "pr_head_not_published"}
+    return bool(checked_head) and checked_head == pr_head, detail
+
+
 def cross_family_review_prompt(pr_num: int, module_path: str) -> str:
     return f"""Adversary cross-family review of PR #{pr_num} on KubeDojo.
 
@@ -356,7 +480,7 @@ def dispatch_claude_review(pr_num: int, module_path: str, slug: str):
             prompt=cross_family_review_prompt(pr_num, module_path),  # reuse same prompt
             mode="read-only",
             cwd=REPO,
-            model="claude-sonnet-4-6",
+            model="claude-sonnet-5-5",
             task_id=f"388-pilot-review-claude-{slug}",
             entrypoint="dispatch",
             hard_timeout=300,
@@ -391,7 +515,7 @@ def dispatch_qwen_review(pr_num: int, module_path: str, slug: str):
             agent_name="qwen",
             prompt=cross_family_review_prompt(pr_num, module_path),  # reuse same prompt
             mode="workspace-write",  # qwen benefits from terminal+file tools (curl, gh pr diff)
-            cwd=REPO,
+            cwd=module_worktree(slug),
             task_id=f"388-pilot-review-qwen-{slug}",
             entrypoint="dispatch",
             hard_timeout=600,
@@ -422,8 +546,8 @@ def dispatch_deepseek_review(pr_num: int, module_path: str, slug: str):
             agent_name="deepseek",
             prompt=cross_family_review_prompt(pr_num, module_path),  # reuse same prompt
             mode="workspace-write",  # deepseek benefits from terminal+file access
-            cwd=REPO,
-            model="deepseek-v4-pro",
+            cwd=module_worktree(slug),
+            model=None,  # lu-machinery release default DeepSeek model
             task_id=f"388-pilot-review-deepseek-{slug}",
             entrypoint="dispatch",
             hard_timeout=600,
@@ -443,7 +567,7 @@ def dispatch_agy_review(pr_num: int, module_path: str, slug: str):
     for the Google One / unpaid tier. Run-time:
     - mode=danger required (dispatch_smart enforces this for agy)
     - no `model=` arg — agy picks model via its TUI panel (env override:
-      KUBEDOJO_AGY_MODEL; adapter default gemini-3.5-flash-high)
+      KUBEDOJO_AGY_MODEL; else the lu-machinery release's default AGY model)
 
     Failure shapes and how they surface to the cascade:
     - Quota-exhausted: invoke returns ok=False, response="" — this function
@@ -462,7 +586,7 @@ def dispatch_agy_review(pr_num: int, module_path: str, slug: str):
             agent_name="agy",
             prompt=cross_family_review_prompt(pr_num, module_path),  # reuse same prompt
             mode="danger",  # required for agy in headless dispatch
-            cwd=REPO,
+            cwd=module_worktree(slug),
             task_id=f"388-pilot-review-agy-{slug}",
             entrypoint="dispatch",
             hard_timeout=900,
@@ -499,14 +623,6 @@ def post_review_comment(pr_num: int, body: str) -> None:
          f"## Cross-family review (#388 pilot)\n\n{body}"],
         cwd=REPO, check=False,
     )
-
-
-def merge_pr(pr_num: int) -> str | None:
-    try:
-        return merge_when_green(pr_num, repo=REPO)
-    except PrMergeError as exc:
-        log({"event": "merge_failed", "pr": pr_num, "error": str(exc)})
-    return None
 
 
 def recheck_module_source_acceptance(worktree: Path, module_path: str) -> dict[str, object]:
@@ -635,6 +751,11 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
 def main(argv: list[str] | None = None) -> int:
     global LOG
     args = parse_args(argv)
+    try:
+        select_product_root(PRIMARY_REPO)
+    except ValueError as exc:
+        print(f"❌ {exc}", file=sys.stderr)
+        return 2
     input_file = args.input or PILOT_FILE
     if args.log is not None:
         LOG = args.log
@@ -650,7 +771,11 @@ def main(argv: list[str] | None = None) -> int:
     if args.max and args.max > 0:
         queue = queue[: args.max]
     log({"event": "pilot_start", "count": len(queue), "input": str(input_file), "repo": str(REPO)})
-    for module_path, requested_budget in queue:
+    for queued_path, requested_budget in queue:
+        module_path = repo_relative_module(queued_path)
+        if module_path is None:
+            log({"event": "module_skip", "module": queued_path, "reason": "module_path_not_canonical"})
+            continue
         if requested_budget is not None:  # declared for visibility only; never a writer target or gate
             _write_budget_sidecar(module_path, requested_budget)
             log({"event": "budget_sidecar_written", "module": module_path, "body_words_min": requested_budget})
@@ -661,9 +786,17 @@ def main(argv: list[str] | None = None) -> int:
         except Exception as e:  # noqa: BLE001
             log({"event": "worktree_error", "module": module_path, "error": repr(e)})
             continue
+        before = writer_snapshot(wt, slug)
+        if before is None:
+            log({"event": "module_skip", "module": module_path, "reason": "published_baseline_unknown"})
+            continue
         codex_result = dispatch_codex(module_path, wt, slug)
         if codex_result is None or not codex_result.ok:
             log({"event": "module_skip", "module": module_path, "reason": "codex_failed"})
+            continue
+        committed, commit_detail = writer_committed_module(wt, module_path, before)
+        if not committed:
+            log({"event": "module_skip", "module": module_path, **commit_detail})
             continue
         pr_num = find_pr_number(codex_result.response or "")
         if pr_num is None:
@@ -672,6 +805,10 @@ def main(argv: list[str] | None = None) -> int:
             if pr_num is None:
                 log({"event": "module_skip", "module": module_path, "reason": "pr_creation_failed"})
                 continue
+        published, heads = published_head_matches(pr_num, wt, commit_detail.get("local_head"))
+        if not published:
+            log({"event": "module_skip", "module": module_path, "pr": pr_num, **heads})
+            continue
         # Reviewer cascade. Primary defaults to claude; override via
         # KUBEDOJO_388_PRIMARY_REVIEWER (claude | agy | qwen | deepseek).
         # Cascade order is always primary → claude → qwen/deepseek fallback

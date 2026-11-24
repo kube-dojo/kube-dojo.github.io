@@ -63,30 +63,6 @@ def test_merge_skips_when_fixture_missing() -> None:
         )
 
 
-def test_claude_adapter_emits_mcp_flags_for_delegate_tool_config() -> None:
-    # Pins the in-tree fork adapter's argv for the delegate config; the shared
-    # ClaudeAdapter's equivalent is not yet verifiable (see the package-5 census).
-    from agent_runtime.adapters.claude import ClaudeAdapter
-
-    tc = merge_delegate_claude_tool_config("claude", "delegate", None)
-    plan = ClaudeAdapter().build_invocation(
-        prompt="brief",
-        mode="danger",
-        cwd=Path.cwd(),
-        model="claude-sonnet-4-6",
-        task_id="t1",
-        session_id=None,
-        tool_config=tc,
-    )
-    assert "--mcp-config" in plan.cmd
-    idx = plan.cmd.index("--mcp-config")
-    assert plan.cmd[idx + 1] == str(CLAUDE_DELEGATE_MCP_CONFIG)
-    tools_idx = plan.cmd.index("--allowedTools")
-    allowed = plan.cmd[tools_idx + 1]
-    assert allowed == CLAUDE_DELEGATE_ALLOWED_TOOLS
-    assert "mcp__" not in allowed
-
-
 def test_fire_passes_delegate_mcp_tool_config_to_runtime(monkeypatch, tmp_path) -> None:
     """The shared runtime does not merge the KubeDojo delegate default; fire does."""
     captured: dict[str, object] = {}

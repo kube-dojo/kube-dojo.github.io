@@ -1,35 +1,39 @@
-"""LLM dispatch — thin wrapper over ``scripts/dispatch.py`` with round-robin.
+"""LLM dispatch — thin wrapper over ``lu_machinery.agent_runtime`` with round-robin.
 
 Contract:
 
-* :func:`dispatch` is a single call site for Codex / Claude / Gemini.
+* :func:`dispatch` is a single call site for Codex / Claude / Gemini (via AGY).
 * :func:`writer_for_index` assigns writer + reviewer by **permanent**
   module index so the assignment is stable across re-bootstraps and
-  SIGKILL-recovery. Even indexes → Codex writes + Claude reviews; odd
-  → Claude writes + Codex reviews.
+  SIGKILL-recovery.
 * :class:`DispatcherUnavailable` is raised when Claude's peak-hours
   guard / budget / rate-limit refuses the call. Callers keep the
   module in a retryable stage (not ``FAILED``) because the LLM is
   temporarily off, not the module.
 
-Delegates to ``scripts/dispatch.py`` as a subprocess so each call gets
-process isolation and inherits the existing budget / peak-hours guards
-without reimplementing them.
+Delegates to :func:`lu_machinery.agent_runtime.runner.invoke` directly so each
+call uses the installed ``lu-machinery`` runtime and inherits its budget,
+watchdog, and rate-limit handling.
 """
 
 from __future__ import annotations
 
-import subprocess
 import time
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Literal
 
+from lu_machinery.agent_runtime.errors import (
+    AgentRuntimeError,
+    AgentTimeoutError,
+    AgentUnavailableError,
+    RateLimitedError,
+)
+from lu_machinery.agent_runtime.runner import invoke
+
 from .worktree import primary_checkout_root
 
 _REPO_ROOT = primary_checkout_root(Path(__file__).resolve().parents[2])
-_VENV_PYTHON = str(_REPO_ROOT / ".venv" / "bin" / "python")
-_DISPATCH_CLI = str(_REPO_ROOT / "scripts" / "dispatch.py")
 
 # "agy" is the Google lane (Antigravity) that replaced the retired gemini-cli
 # (#2125). "gemini" is retained as a still-accepted agent string for the legacy
@@ -102,71 +106,105 @@ def dispatch(
     cwd: Path | None = None,
     tools_disabled: bool = False,
 ) -> DispatchResult:
-    """Call ``scripts/dispatch.py <agent>`` with the prompt on stdin.
+    """Invoke ``agent`` through :func:`lu_machinery.agent_runtime.runner.invoke`.
 
     ``cwd`` defaults to the primary checkout. Pass the worktree path when
     dispatching a writer — Codex's file operations anchor to cwd.
 
-    ``tools_disabled=True`` forces text-only output (no Edit/Write/Bash
-    tool use). Required for v2 writer/reviewer dispatches: Claude
-    in print mode is agentic by default and will modify files in
-    ``cwd``, returning only a summary on stdout. Currently honored for
-    Claude only; Codex relies on its ``--sandbox read-only`` setting
-    in :mod:`scripts.dispatch` and Gemini has no built-in tools.
+    Every call runs in ``read-only`` mode. Codex enforces that with its
+    read-only sandbox; AGY gets the release's bounded read-only route when
+    the call passes no ``tool_config`` (lu-machinery >= 0.1.64), and a
+    partial hand-built config is refused there. Claude's read-only mode still
+    honours allow rules from checkout settings, so ``tools_disabled=True``
+    (text-only writer/reviewer output) asks the runtime for its read-only
+    tool set (``--tools Read,Grep,Glob,LS``): no edit, write or shell tool
+    exists in that run. Legacy ``"gemini"`` callers route through the
+    ``"agy"`` adapter while preserving ``agent="gemini"`` on the returned
+    :class:`DispatchResult`.
 
-    Raises :class:`DispatcherUnavailable` when the stderr signals a
-    temporary refusal. Returns :class:`DispatchResult` with ``ok=False``
-    for genuine failures (crashes, timeouts, non-zero exits without
-    availability markers) — caller decides retry vs FAILED.
+    Raises :class:`DispatcherUnavailable` when the runtime signals a
+    temporary refusal (rate limit, budget, peak hours, unavailable).
+    Returns :class:`DispatchResult` with ``ok=False`` for genuine failures
+    (crashes, timeouts, non-zero exits without availability markers) and
+    for pre-launch refusals (``dispatch_refused: ...``), such as a read-only
+    AGY ask whose product review hooks cannot load.
     """
     if agent not in VALID_AGENTS:
         raise ValueError(f"unknown agent {agent!r}; expected one of {sorted(VALID_AGENTS)}")
 
-    cmd: list[str] = [_VENV_PYTHON, _DISPATCH_CLI, agent, "-", "--timeout", str(timeout)]
-    if model:
-        cmd.extend(["--model", model])
-    if tools_disabled and agent == "claude":
-        cmd.append("--no-tools")
+    runtime_agent = "agy" if agent == "gemini" else agent
+    tool_config: dict[str, bool] | None = None
+    if runtime_agent == "claude" and tools_disabled:
+        tool_config = {"discussion_readonly": True}
 
     t0 = time.monotonic()
     try:
-        proc = subprocess.run(
-            cmd,
-            input=prompt,
-            cwd=str(cwd or _REPO_ROOT),
-            capture_output=True,
-            text=True,
-            timeout=timeout + 30,  # headroom so dispatch.py's own timeout fires first
-            check=False,
+        res = invoke(
+            runtime_agent,
+            prompt,
+            mode="read-only",
+            cwd=cwd or _REPO_ROOT,
+            model=model,
+            entrypoint="quality_pipeline",
+            hard_timeout=timeout,
+            tool_config=tool_config,
         )
-    except subprocess.TimeoutExpired:
+    except AgentTimeoutError:
         return DispatchResult(
             ok=False,
             stdout="",
-            stderr=f"dispatch_wrapper_timeout_after_{timeout + 30}s",
+            stderr=f"dispatch_timeout_after_{timeout}s",
+            returncode=-1,
+            duration_sec=time.monotonic() - t0,
+            agent=agent,
+            model=model,
+        )
+    except (RateLimitedError, AgentUnavailableError) as exc:
+        raise DispatcherUnavailable(f"{agent} refused the call: {str(exc)[:400]}") from exc
+    except AgentRuntimeError as exc:
+        return DispatchResult(
+            ok=False,
+            stdout="",
+            stderr=f"dispatch_runtime_error: {str(exc)[:400]}",
+            returncode=-1,
+            duration_sec=time.monotonic() - t0,
+            agent=agent,
+            model=model,
+        )
+    except ImportError as exc:
+        # The release refuses a read-only AGY ask whose product review hooks
+        # cannot load (ProductHooksError / ConfiguredModuleError, both
+        # ImportError) before launch. That is a permanent refusal, not a
+        # temporary unavailability, so it returns a handled failure and the
+        # caller's stage cleanup and state transition run.
+        return DispatchResult(
+            ok=False,
+            stdout="",
+            stderr=f"dispatch_refused: {type(exc).__name__}: {str(exc)[:400]}",
             returncode=-1,
             duration_sec=time.monotonic() - t0,
             agent=agent,
             model=model,
         )
 
-    stdout = proc.stdout or ""
-    stderr = proc.stderr or ""
+    stdout = res.response or ""
+    stderr = res.stderr_excerpt or ""
     duration = time.monotonic() - t0
 
-    if proc.returncode != 0 and _looks_unavailable(stderr + "\n" + stdout):
+    if not res.ok and _looks_unavailable(stderr + "\n" + stdout):
         raise DispatcherUnavailable(
             f"{agent} refused the call: {(stderr or stdout).strip()[:400]}"
         )
 
+    rc = 0 if res.ok else (res.returncode if res.returncode is not None else 1)
     return DispatchResult(
-        ok=proc.returncode == 0,
+        ok=res.ok,
         stdout=stdout,
         stderr=stderr,
-        returncode=proc.returncode,
+        returncode=rc,
         duration_sec=duration,
         agent=agent,
-        model=model,
+        model=res.model or model,
     )
 
 
@@ -199,8 +237,7 @@ def tiebreaker_agent() -> Agent:
     codex/claude writer/reviewer rotation, so its verdict is structurally
     independent (replaces the retired gemini-cli, #2125). The tiebreaker is
     dispatched via ``dispatch(reviewer, ...)`` in stages.py WITHOUT an explicit
-    model, so it resolves to ``dispatch.py``'s ``AGY_DEFAULT_MODEL``
-    (gemini-3.1-pro-high). See #2125 note: to pin the flash review model here
-    the tiebreaker dispatch would need to pass ``model=``.
+    model, so it resolves to the lu-machinery release's default AGY model.
+    To pin a review model here the tiebreaker dispatch would pass ``model=``.
     """
     return "agy"

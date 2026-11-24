@@ -20,18 +20,20 @@ from __future__ import annotations
 import argparse
 import concurrent.futures as cf
 import json
-import subprocess
 import sys
 import time
 from pathlib import Path
+
+from lu_machinery.agent_runtime.errors import (
+    AgentRuntimeError,
+    AgentTimeoutError,
+)
+from lu_machinery.agent_runtime.runner import invoke
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 CONTENT_ROOT = REPO_ROOT / "src" / "content" / "docs"
 AUDIT_DIR = REPO_ROOT / ".pipeline" / "teaching-audit"
 PROMPT_TEMPLATE = REPO_ROOT / "scripts" / "prompts" / "audit_teaching.md"
-
-_VENV_PYTHON = str(REPO_ROOT / ".venv" / "bin" / "python")
-DISPATCH = str(REPO_ROOT / "scripts" / "dispatch.py")
 
 
 def slug_for(path: Path) -> str:
@@ -92,24 +94,32 @@ def audit_one(module_path: Path, model: str, timeout: int, force: bool) -> tuple
     if out.exists() and not force:
         return module_path, "skipped_exists", json.loads(out.read_text())
     prompt = build_prompt(module_path)
-    cmd = [
-        _VENV_PYTHON, DISPATCH, "gemini", "-",
-        "--model", model,
-        "--timeout", str(timeout),
-    ]
     t0 = time.time()
     try:
-        result = subprocess.run(
-            cmd, input=prompt, capture_output=True, text=True, timeout=timeout + 30
+        result = invoke(
+            "agy",
+            prompt,
+            mode="read-only",
+            cwd=REPO_ROOT,
+            model=model,
+            entrypoint="audit_teaching_quality",
+            hard_timeout=timeout,
         )
-    except subprocess.TimeoutExpired:
-        return module_path, "timeout", f"timed out after {timeout + 30}s"
+    except AgentTimeoutError:
+        return module_path, "timeout", f"timed out after {timeout}s"
+    except AgentRuntimeError as exc:
+        return module_path, "dispatch_error", str(exc)[:2000]
+    except ImportError as exc:
+        # Pre-launch refusal of the read-only AGY ask (product review hooks
+        # unavailable; ProductHooksError / ConfiguredModuleError).
+        return module_path, "dispatch_error", f"{type(exc).__name__}: {exc}"[:2000]
     elapsed = time.time() - t0
-    if result.returncode != 0:
-        return module_path, "dispatch_error", (result.stderr or result.stdout)[:2000]
-    parsed = extract_json(result.stdout)
+    if not result.ok:
+        return module_path, "dispatch_error", (result.stderr_excerpt or result.response or "")[:2000]
+    stdout = result.response or ""
+    parsed = extract_json(stdout)
     if parsed is None:
-        return module_path, "parse_error", result.stdout[:2000]
+        return module_path, "parse_error", stdout[:2000]
     parsed["_meta"] = {
         "module_path": module_path.relative_to(REPO_ROOT).as_posix(),
         "model": model,
@@ -132,10 +142,13 @@ def main() -> int:
     ap.add_argument("--module", action="append", default=[], help="Specific module path (may repeat)")
     ap.add_argument("--all", action="store_true", help="Audit all English content modules")
     ap.add_argument("--workers", type=int, default=1, help="Parallel workers (cap 3)")
-    ap.add_argument("--model", default="gemini-3-flash-preview", help="Gemini model")
+    ap.add_argument("--model", default="gemini-4-hydrogen-medium", help="AGY (Gemini) model")
     ap.add_argument("--timeout", type=int, default=300, help="Per-module timeout seconds")
     ap.add_argument("--force", action="store_true", help="Re-audit even if output exists")
     args = ap.parse_args()
+    from lu_machinery.review.model_catalog import retired_model_refusal
+    if refusal := retired_model_refusal(args.model):
+        ap.error(f"--model {args.model!r}: {refusal}")
 
     if args.workers > 3:
         print(f"workers capped 3 (requested {args.workers})", file=sys.stderr)

@@ -5,7 +5,7 @@ queue (Issue #394). Generalized 2026-04-28 evening so Parts 6/7 can flip
 to Codex when Claude's weekly credit pool is throttled. Each call spins
 up a fresh `<agent>/394-ch{N}-research` worktree off main, drops a
 focused prompt that points the headless agent at the chapter slug
-directory, and fires `agent_runtime.runner.invoke` in workspace-write
+directory, and fires `lu_machinery.agent_runtime.runner.invoke` in danger
 mode with the agent's right model + reasoning settings.
 
 Usage:
@@ -33,21 +33,30 @@ import sys
 from pathlib import Path
 from textwrap import dedent
 
-REPO = Path("/Users/krisztiankoos/projects/kubedojo")
+_CHECKOUT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(_CHECKOUT / "scripts"))
+
+from quality.writer_commit import produced, select_product_root, snapshot
+
+# The primary checkout: dispatch worktrees live under <primary>/.worktrees/.
+REPO = (
+    Path(*_CHECKOUT.parts[: _CHECKOUT.parts.index(".worktrees")])
+    if ".worktrees" in _CHECKOUT.parts
+    else _CHECKOUT
+)
 
 
 AGENT_DEFAULTS: dict[str, dict[str, object]] = {
     "claude": {
-        "model": "claude-opus-4-8",
+        "model": "claude-opus-5-5",
         "owner_label": "Claude",
         # Keep claude-opus pegged at 60 min; mirrors prior behavior.
         "hard_timeout": 3600,
     },
     "codex": {
-        # gpt-5.5 + reasoning=high is set in ~/.codex/config.toml as the
-        # user-level default; passing model="gpt-5.5" here keeps it
-        # explicit per reference_codex_models.md.
-        "model": "gpt-5.5",
+        # None takes the lu-machinery release's default Codex model, so a
+        # catalog retirement never strands this dispatcher on a dead pin.
+        "model": None,
         "owner_label": "Codex",
         "hard_timeout": 3600,
     },
@@ -173,7 +182,7 @@ def make_prompt(*, ch_num: int, slug: str, supersede_pr: int | None,
 
         ## Workflow
 
-        1. `cd /Users/krisztiankoos/projects/kubedojo/.worktrees/{agent}-394-ch{ch_num:02d}-research`
+        1. `cd {REPO}/.worktrees/{agent}-394-ch{ch_num:02d}-research`
         2. Read TEAM_WORKFLOW, the Ch11 templates, the existing
            legacy chapter dir and prose if any, the staged files if
            any.
@@ -265,15 +274,15 @@ def stage_files(worktree: Path, files: list[Path]) -> list[Path]:
 
 
 def fire_dispatch(*, worktree: Path, prompt: str, task_id: str,
-                  log_path: Path, agent: str) -> int:
+                  log_path: Path, agent: str, artifact_dir: str, branch: str) -> int:
     """Run the dispatch in the current process, tee output to log."""
-    sys.path.insert(0, str(REPO / "scripts"))
-    from agent_runtime.runner import invoke
+    from lu_machinery.agent_runtime.runner import invoke
 
     cfg = AGENT_DEFAULTS[agent]
-    model = str(cfg["model"])
+    model = cfg["model"]
     timeout = int(cfg["hard_timeout"])  # type: ignore[arg-type]
     print(f"[dispatch] firing {agent} ({model}) on {task_id} ...")
+    before = snapshot(worktree, f"refs/heads/{branch}")
     result = invoke(
         agent,
         prompt,
@@ -296,7 +305,18 @@ def fire_dispatch(*, worktree: Path, prompt: str, task_id: str,
         f"stderr_excerpt: {result.stderr_excerpt or '(none)'}",
     ]))
     print(f"[dispatch] OK={result.ok}, log -> {log_path}")
-    return 0 if result.ok else 1
+    if not result.ok:
+        return 1
+    # The release runner returns a parsed success without checking that a
+    # write-mode run produced anything. The prompt's deliverable is a local
+    # commit of the chapter's contract directory on the worktree branch; the
+    # shared rule decides whether the branch tip holds new work there.
+    _final, reason = produced(worktree, before, artifact_dir, f"refs/heads/{branch}", kind="dir")
+    if reason is not None:
+        print(f"[dispatch] {agent} reported success but {branch} holds no new "
+              f"committed work under {artifact_dir} ({reason}); treating as failure")
+        return 1
+    return 0
 
 
 def main() -> int:
@@ -315,11 +335,16 @@ def main() -> int:
                         "root. Repeatable.")
     args = p.parse_args()
 
+    try:
+        select_product_root(REPO)
+    except ValueError as exc:
+        p.error(str(exc))
+
     part_num = detect_part(args.ch_num)
     print(f"[main] Ch{args.ch_num:02d} `{args.slug}` "
           f"(Part {part_num}, agent={args.agent})")
 
-    worktree, _ = setup_worktree(args.ch_num, args.agent)
+    worktree, branch = setup_worktree(args.ch_num, args.agent)
     staging_files = stage_files(
         worktree,
         [Path(s) if Path(s).is_absolute() else (REPO / s) for s in args.stage],
@@ -343,6 +368,8 @@ def main() -> int:
         task_id=f"ch{args.ch_num:02d}-research-{args.agent}-2026-04-28",
         log_path=log_path,
         agent=args.agent,
+        artifact_dir=f"docs/research/ai-history/chapters/{args.slug}/",
+        branch=branch,
     )
 
 

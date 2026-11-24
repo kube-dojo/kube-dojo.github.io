@@ -4,8 +4,8 @@ For each PR:
 1. Read brief.md, sources.md, open-questions.md, scene-sketches.md from
    the PR branch (`git show <branch>:<path>`).
 2. Fire the cross-family **anchor verifier** (route on PR branch prefix):
-   - `claude/394-chNN-research` -> Codex (gpt-5.5, reasoning=high)
-   - `codex/394-chNN-research`  -> Claude (claude-opus-4-8)
+   - `claude/394-chNN-research` -> Codex (release default model)
+   - `codex/394-chNN-research`  -> Claude (claude-opus-5-5)
    Both have shell access and can curl/pdftotext/grep page anchors.
 3. Fire an agy (Google lane) structural gap-audit on both (lane-disciplined
    per feedback_gemini_hallucinates_anchors.md — NO URL citations from the
@@ -36,7 +36,13 @@ import threading
 from pathlib import Path
 from textwrap import dedent
 
-REPO = Path("/Users/krisztiankoos/projects/kubedojo")
+_CHECKOUT = Path(__file__).resolve().parents[1]
+# The primary checkout: dispatch worktrees live under <primary>/.worktrees/.
+REPO = (
+    Path(*_CHECKOUT.parts[: _CHECKOUT.parts.index(".worktrees")])
+    if ".worktrees" in _CHECKOUT.parts
+    else _CHECKOUT
+)
 sys.path.insert(0, str(REPO / "scripts"))
 
 
@@ -317,21 +323,20 @@ def agy_verdict_prompt(*, slug: str, contract: str) -> str:
 
 
 def fire(agent: str, *, prompt: str, slug: str) -> tuple[bool, str]:
-    from agent_runtime.runner import invoke
-    from agent_runtime.errors import RateLimitedError, AgentTimeoutError
+    from lu_machinery.agent_runtime.errors import AgentTimeoutError, RateLimitedError
+    from lu_machinery.agent_runtime.runner import invoke
 
     if agent == "codex":
-        # gpt-5.5 + model_reasoning_effort=high are pinned in
-        # ~/.codex/config.toml, so we just need model="gpt-5.5".
-        model = "gpt-5.5"
+        # None takes the lu-machinery release's default Codex model.
+        model = None
         timeout = 1500
     elif agent == "claude":
-        model = "claude-opus-4-8"
+        model = "claude-opus-5-5"
         timeout = 1500
     elif agent == "agy":
-        # agy flash lane (replaced the retired gemini-cli, #2125/#2230).
-        # Must be a valid agy model slug, NOT a gemini-cli model id.
-        model = "gemini-3.5-flash-high"
+        # agy flash-tier lane (replaced the retired gemini-cli, #2125/#2230).
+        # None takes the release's default AGY model, which is the flash tier.
+        model = None
         timeout = 900
     else:
         raise ValueError(agent)
@@ -345,6 +350,8 @@ def fire(agent: str, *, prompt: str, slug: str) -> tuple[bool, str]:
             task_id=f"verdict-{slug}-{agent}",
             entrypoint="consult",
             hard_timeout=timeout,
+            # No tool_config: the release provisions read-only AGY's bounded
+            # route itself; a partial hand-built config is refused.
         )
         return r.ok, (r.response or "")
     except (RateLimitedError, AgentTimeoutError) as e:

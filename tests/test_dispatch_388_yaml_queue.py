@@ -30,6 +30,7 @@ def isolated_pilot(tmp_path, monkeypatch):
     monkeypatch.setattr(pilot.subprocess, "run", forbidden)
     monkeypatch.setattr(pilot.subprocess, "Popen", forbidden)
     monkeypatch.delenv("KUBEDOJO_388_PRIMARY_REVIEWER", raising=False)
+    monkeypatch.setenv("LU_PRODUCT_ROOT", str(tmp_path))
     monkeypatch.setattr(pilot, "REPO", tmp_path)
     monkeypatch.setattr(pilot, "PRIMARY_REPO", tmp_path)
     monkeypatch.setattr(pilot, "PILOT_FILE", tmp_path / "scripts/quality/pilot-2026-05-02.txt")
@@ -43,9 +44,11 @@ def isolated_pilot(tmp_path, monkeypatch):
     mocks = {name: MagicMock(return_value=("VERDICT: APPROVE", "APPROVE")) for name in reviewers}
     for name, mock in mocks.items():
         monkeypatch.setattr(pilot, f"dispatch_{name}_review", mock)
-    monkeypatch.setattr(pilot, "merge_pr", MagicMock(return_value="abc123"))
     monkeypatch.setattr(pilot, "dispatch_backfill", MagicMock(return_value=True))
     monkeypatch.setattr(pilot, "make_worktree", MagicMock(return_value=tmp_path))
+    monkeypatch.setattr(pilot, "writer_snapshot", MagicMock(return_value=MagicMock()))
+    monkeypatch.setattr(pilot, "writer_committed_module", MagicMock(return_value=(True, {})))
+    monkeypatch.setattr(pilot, "published_head_matches", MagicMock(return_value=(True, {})))
     monkeypatch.setattr(pilot, "post_review_comment", MagicMock())
     source_recheck = MagicMock(return_value={"status": "unverified"})
     monkeypatch.setattr(pilot, "recheck_module_source_acceptance", source_recheck)

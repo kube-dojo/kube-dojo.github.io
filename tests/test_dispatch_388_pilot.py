@@ -2,7 +2,9 @@
 from __future__ import annotations
 
 import json
+import os
 import re
+import subprocess
 import sys
 from pathlib import Path
 from unittest.mock import MagicMock, patch
@@ -127,15 +129,18 @@ def test_main_approve_holds_merge_and_backfill_for_all_queued_items(tmp_path, ca
         module.parent.mkdir(parents=True, exist_ok=True)
         module.write_text("---\ncitations_verified: true\nrevision_pending: false\n---\nDraft\n")
 
-    with patch.object(pilot, "REPO", tmp_path), \
+    with patch.dict(os.environ, {"LU_PRODUCT_ROOT": str(tmp_path)}), \
+         patch.object(pilot, "REPO", tmp_path), \
          patch.object(pilot, "PILOT_FILE", queue), \
          patch.object(pilot, "LOG", tmp_path / "pilot.jsonl"), \
          patch.object(pilot, "invoke", side_effect=AssertionError("unexpected provider call")), \
          patch.object(pilot.subprocess, "run", side_effect=AssertionError("unexpected subprocess")), \
          patch("scripts.quality.dispatch_388_pilot.make_worktree", return_value=tmp_path), \
          patch("scripts.quality.dispatch_388_pilot.dispatch_codex", return_value=codex_result), \
+         patch("scripts.quality.dispatch_388_pilot.writer_snapshot", return_value=MagicMock()), \
+         patch("scripts.quality.dispatch_388_pilot.writer_committed_module", return_value=(True, {})), \
+         patch("scripts.quality.dispatch_388_pilot.published_head_matches", return_value=(True, {})), \
          patch("scripts.quality.dispatch_388_pilot.build_reviewer_cascade", return_value=[("claude", reviewer)]), \
-         patch("scripts.quality.dispatch_388_pilot.merge_pr", return_value="abc123") as mock_merge, \
          patch("scripts.quality.dispatch_388_pilot.dispatch_backfill", return_value=True) as mock_backfill, \
          patch("scripts.quality.dispatch_388_pilot.post_review_comment") as mock_post_review, \
          patch("scripts.quality.dispatch_388_pilot.time.sleep"), \
@@ -145,7 +150,7 @@ def test_main_approve_holds_merge_and_backfill_for_all_queued_items(tmp_path, ca
     assert rc == 0
     assert reviewer.call_count == 2
     assert mock_post_review.call_count == 2
-    mock_merge.assert_not_called()
+    assert not hasattr(pilot, "merge_pr")  # the pilot has no merge path at all
     mock_backfill.assert_not_called()
     events = [c.args[0]["event"] for c in mock_log.call_args_list]
     assert events.count("source_acceptance_unverified") == 2
@@ -188,19 +193,22 @@ def test_main_nonapprove_verdicts_remain_held(tmp_path, verdict, expected_event)
     codex_result = MagicMock(ok=True, response="Opened PR: https://github.com/org/repo/pull/42")
     reviewer = MagicMock(return_value=(f"VERDICT: {verdict}", verdict))
 
-    with patch.object(pilot, "invoke", side_effect=AssertionError("unexpected provider call")), \
+    with patch.dict(os.environ, {"LU_PRODUCT_ROOT": str(tmp_path)}), \
+         patch.object(pilot, "invoke", side_effect=AssertionError("unexpected provider call")), \
          patch.object(pilot.subprocess, "run", side_effect=AssertionError("unexpected subprocess")), \
          patch("scripts.quality.dispatch_388_pilot.make_worktree", return_value=tmp_path), \
          patch("scripts.quality.dispatch_388_pilot.dispatch_codex", return_value=codex_result), \
+         patch("scripts.quality.dispatch_388_pilot.writer_snapshot", return_value=MagicMock()), \
+         patch("scripts.quality.dispatch_388_pilot.writer_committed_module", return_value=(True, {})), \
+         patch("scripts.quality.dispatch_388_pilot.published_head_matches", return_value=(True, {})), \
          patch("scripts.quality.dispatch_388_pilot.build_reviewer_cascade", return_value=[("claude", reviewer)]), \
-         patch("scripts.quality.dispatch_388_pilot.merge_pr") as mock_merge, \
          patch("scripts.quality.dispatch_388_pilot.dispatch_backfill") as mock_backfill, \
          patch("scripts.quality.dispatch_388_pilot.post_review_comment"), \
          patch("scripts.quality.dispatch_388_pilot.time.sleep"), \
          patch("scripts.quality.dispatch_388_pilot.log") as mock_log:
         assert pilot.main(["--input", str(queue)]) == 0
 
-    mock_merge.assert_not_called()
+    assert not hasattr(pilot, "merge_pr")  # the pilot has no merge path at all
     mock_backfill.assert_not_called()
     events = [c.args[0]["event"] for c in mock_log.call_args_list]
     assert expected_event in events
@@ -387,3 +395,106 @@ def test_dispatch_agy_review_invoke_exception_returns_error(
 
     assert text is None
     assert verdict == "ERROR"
+
+
+def _git(cwd, *args):
+    return subprocess.run(["git", "-c", "user.name=t", "-c", "user.email=t@example.invalid", *args],
+                          cwd=cwd, check=True, capture_output=True, text=True, timeout=60).stdout.strip()
+
+
+@pytest.mark.parametrize(
+    ("writer", "pr_head", "ls_remote_rc", "reason"),
+    [
+        ("commit", "stale", 2, "pr_head_not_published"),
+        ("idle", "local", 2, "no_new_commit"),
+        ("rollback", "local", 2, "not_descendant"),
+        ("revert", "local", 2, "no_net_change"),
+        ("fast_forward_prior", "local", 2, "no_new_artifact_commit"),
+        ("ff_edit_revert", "local", 2, "no_net_change"),
+        ("mode_only", "local", 2, "no_net_change"),
+        ("symlink_replaces_module", "local", 2, "artifact_type_mismatch"),
+        ("commit", "local", 128, "published_baseline_unknown"),
+    ],
+)
+def test_main_skips_review_when_local_head_not_published(tmp_path, writer, pr_head, ls_remote_rc, reason):
+    """Defect class: the module advances to review although no new commit of
+    this writer run is the published PR head: a stale or unpushed remote, an
+    idle writer in a reused worktree, a reset to an older commit, a commit
+    followed by its reversal, a fast-forward to output that existed before
+    dispatch (an earlier run's branch), also when followed by an edit and its
+    reversal, a commit that only changes the file mode, a symlink committed
+    in place of the module, or a published baseline that could not be looked
+    up."""
+    module_path = "src/content/docs/k8s/cka/module-1.md"
+    module = tmp_path / module_path
+    module.parent.mkdir(parents=True)
+    module.write_text("old\n")
+    _git(tmp_path, "init", "-q", "-b", "codex/388-pilot-k8s-cka-module-1")
+    _git(tmp_path, "add", "-A")
+    _git(tmp_path, "commit", "-q", "-m", "A")
+    module.write_text("start\n")
+    _git(tmp_path, "commit", "-q", "-am", "B")
+    _git(tmp_path, "checkout", "-q", "-b", "prior-output")
+    module.write_text("prior output\n")
+    _git(tmp_path, "commit", "-q", "-am", "C")
+    _git(tmp_path, "checkout", "-q", "codex/388-pilot-k8s-cka-module-1")
+    queue = tmp_path / "queue.txt"
+    queue.write_text(module_path)
+    reviewer = MagicMock(return_value=("VERDICT: APPROVE", "APPROVE"))
+
+    def writer_run(*args, **kwargs):
+        if writer in ("commit", "revert"):
+            module.write_text("draft\n")
+            _git(tmp_path, "commit", "-q", "-am", "draft")
+        if writer == "revert":
+            module.write_text("start\n")
+            _git(tmp_path, "commit", "-q", "-am", "revert")
+        if writer == "rollback":
+            _git(tmp_path, "reset", "-q", "--hard", "HEAD~1")
+        if writer == "mode_only":
+            module.chmod(0o755)
+            _git(tmp_path, "commit", "-q", "-am", "mode only")
+        if writer == "symlink_replaces_module":
+            module.unlink()
+            module.symlink_to("module-elsewhere.md")
+            _git(tmp_path, "add", "-A")
+            _git(tmp_path, "commit", "-q", "-m", "symlink in place of the module")
+        if writer in ("fast_forward_prior", "ff_edit_revert"):
+            _git(tmp_path, "merge", "-q", "--ff-only", "prior-output")
+        if writer == "ff_edit_revert":
+            module.write_text("temporary\n")
+            _git(tmp_path, "commit", "-q", "-am", "temporary")
+            module.write_text("prior output\n")
+            _git(tmp_path, "commit", "-q", "-am", "revert temporary")
+        return MagicMock(ok=True, response="Opened PR: https://github.com/org/repo/pull/42")
+
+    real_run = subprocess.run
+
+    def fake_run(cmd, **kwargs):
+        if cmd[:2] == ["git", "ls-remote"]:
+            return _mock_run(ls_remote_rc, "")
+        if cmd[:3] == ["gh", "pr", "view"]:
+            head = _git(tmp_path, "rev-parse", "HEAD") if pr_head == "local" else "stale-sha"
+            return _mock_run(0, head + "\n")
+        assert cmd[0] == "git", cmd
+        return real_run(cmd, **kwargs)
+
+    with patch.dict(os.environ, {"LU_PRODUCT_ROOT": str(tmp_path)}), \
+         patch.object(pilot, "REPO", tmp_path), \
+         patch.object(pilot, "PILOT_FILE", queue), \
+         patch.object(pilot, "LOG", tmp_path / "pilot.jsonl"), \
+         patch.object(pilot, "invoke", side_effect=AssertionError("unexpected provider call")), \
+         patch.object(pilot.subprocess, "run", side_effect=fake_run), \
+         patch("scripts.quality.dispatch_388_pilot.make_worktree", return_value=tmp_path), \
+         patch("scripts.quality.dispatch_388_pilot.dispatch_codex", side_effect=writer_run), \
+         patch("scripts.quality.dispatch_388_pilot.build_reviewer_cascade", return_value=[("claude", reviewer)]), \
+         patch("scripts.quality.dispatch_388_pilot.post_review_comment") as mock_post_review, \
+         patch("scripts.quality.dispatch_388_pilot.time.sleep"), \
+         patch("scripts.quality.dispatch_388_pilot.log") as mock_log:
+        assert pilot.main(["--input", str(queue)]) == 0
+
+    reviewer.assert_not_called()
+    mock_post_review.assert_not_called()
+    skipped = [c.args[0] for c in mock_log.call_args_list if c.args[0]["event"] == "module_skip"]
+    assert len(skipped) == 1
+    assert skipped[0]["reason"] == reason

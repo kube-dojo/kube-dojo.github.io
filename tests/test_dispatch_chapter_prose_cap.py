@@ -1,4 +1,5 @@
 """The chapter dispatcher checks every successful output without a provider."""
+import subprocess
 import sys
 from types import ModuleType
 from unittest.mock import MagicMock
@@ -16,16 +17,26 @@ def isolated(tmp_path, monkeypatch):
     class AgentTimeoutError(Exception):
         pass
 
-    runner = ModuleType("agent_runtime.runner")
+    runner = ModuleType("lu_machinery.agent_runtime.runner")
     runner.invoke = MagicMock(side_effect=AssertionError("unexpected provider invocation"))
-    errors = ModuleType("agent_runtime.errors")
+    errors = ModuleType("lu_machinery.agent_runtime.errors")
     errors.RateLimitedError = RateLimitedError
     errors.AgentTimeoutError = AgentTimeoutError
-    package = ModuleType("agent_runtime")
-    package.__path__ = []
-    for name, module in (("agent_runtime", package), ("agent_runtime.runner", runner),
-                         ("agent_runtime.errors", errors)):
+    runtime_pkg = ModuleType("lu_machinery.agent_runtime")
+    runtime_pkg.__path__ = []
+    runtime_pkg.runner = runner
+    runtime_pkg.errors = errors
+    top_pkg = ModuleType("lu_machinery")
+    top_pkg.__path__ = []
+    top_pkg.agent_runtime = runtime_pkg
+    for name, module in (
+        ("lu_machinery", top_pkg),
+        ("lu_machinery.agent_runtime", runtime_pkg),
+        ("lu_machinery.agent_runtime.runner", runner),
+        ("lu_machinery.agent_runtime.errors", errors),
+    ):
         monkeypatch.setitem(sys.modules, name, module)
+    monkeypatch.setenv("LU_PRODUCT_ROOT", str(tmp_path))
     setup = MagicMock(return_value=(tmp_path, "test-branch"))
     monkeypatch.setattr(prose, "setup_worktree", setup)
     monkeypatch.setattr(prose, "stage_contract_locally", lambda **kwargs: {"brief.md": "test"})
@@ -128,7 +139,7 @@ def test_recovered_commit_success_still_checks_actual_output(isolated, monkeypat
     path.write_text(body, encoding="utf-8")
     isolated["runner"].invoke.side_effect = isolated["rate_limited"]("simulated")
     committed = MagicMock(return_value=True)
-    monkeypatch.setattr(prose, "_prose_committed_on_branch", committed)
+    monkeypatch.setattr(prose, "_prose_committed_since", committed)
     real_phase = isolated["original_phase"]
 
     def recovered(**kwargs):
@@ -142,4 +153,79 @@ def test_recovered_commit_success_still_checks_actual_output(isolated, monkeypat
     assert ("over cap" in output.err) is not success
     assert path.read_text(encoding="utf-8") == body
     committed.assert_called_once()
+    isolated["runner"].invoke.assert_called_once()
+
+
+def _git(cwd, *args):
+    subprocess.run(["git", "-c", "user.name=t", "-c", "user.email=t@example.invalid", *args],
+                   cwd=cwd, check=True, capture_output=True, timeout=60)
+
+
+@pytest.mark.parametrize(("writer", "success"), [
+    ("idle", False), ("uncommitted", False), ("reverted", False), ("rollback", False),
+    ("other_branch", False), ("fast_forward_prior", False), ("ff_edit_revert", False),
+    ("mode_only", False), ("dir_replaces_file", False), ("committed", True), ("commit_after_prior", True),
+])
+def test_phase_success_without_artifact_change_fails(isolated, monkeypatch, tmp_path, capsys, writer, success):
+    """Defect class: a writer reports success but this phase left no new, net,
+    clean commit of the chapter on the worktree's branch (no write at all;
+    bytes written but never committed, which the later push would leave
+    behind; a commit followed by its reversal; a reset to an older commit; a
+    commit on another branch; or a fast-forward to output that existed before
+    the phase, such as an earlier run's branch, also when followed by an edit
+    and its reversal; a commit that only changes the file mode; or a
+    directory committed in place of the chapter file), so the pipeline must
+    not advance on it. New work on top of earlier output is
+    still accepted."""
+    arguments(monkeypatch, phases="agy")
+    path = isolated["path"]
+    path.parent.mkdir(parents=True)
+    _git(tmp_path, "init", "-q", "-b", "test-branch")
+    path.write_text("old", encoding="utf-8")
+    _git(tmp_path, "add", "-A")
+    _git(tmp_path, "commit", "-q", "-m", "old")
+    path.write_text("stub", encoding="utf-8")
+    _git(tmp_path, "commit", "-q", "-am", "stub")
+    _git(tmp_path, "checkout", "-q", "-b", "prior-output")
+    path.write_text("prior output", encoding="utf-8")
+    _git(tmp_path, "commit", "-q", "-am", "prior output")
+    _git(tmp_path, "checkout", "-q", "test-branch")
+
+    def provider(*args, **kwargs):
+        if writer in ("fast_forward_prior", "ff_edit_revert", "commit_after_prior"):
+            _git(tmp_path, "merge", "-q", "--ff-only", "prior-output")
+        if writer == "ff_edit_revert":
+            path.write_text("temporary", encoding="utf-8")
+            _git(tmp_path, "commit", "-q", "-am", "temporary")
+            path.write_text("prior output", encoding="utf-8")
+            _git(tmp_path, "commit", "-q", "-am", "revert temporary")
+        if writer == "rollback":
+            _git(tmp_path, "reset", "-q", "--hard", "HEAD~1")
+        if writer == "mode_only":
+            path.chmod(0o755)
+            _git(tmp_path, "commit", "-q", "-am", "mode only")
+        if writer == "dir_replaces_file":
+            path.unlink()
+            path.mkdir()
+            (path / "placeholder.md").write_text("one two", encoding="utf-8")
+            _git(tmp_path, "add", "-A")
+            _git(tmp_path, "commit", "-q", "-m", "directory in place of the chapter")
+        if writer == "other_branch":
+            _git(tmp_path, "checkout", "-q", "-b", "elsewhere")
+        if writer in ("uncommitted", "reverted", "other_branch", "committed", "commit_after_prior"):
+            path.write_text("one two", encoding="utf-8")
+        if writer in ("reverted", "other_branch", "committed", "commit_after_prior"):
+            _git(tmp_path, "commit", "-q", "-am", "draft")
+        if writer == "reverted":
+            path.write_text("stub", encoding="utf-8")
+            _git(tmp_path, "commit", "-q", "-am", "revert draft")
+        return MagicMock(ok=True, response="done", session_id=None, stderr_excerpt="")
+
+    isolated["runner"].invoke.side_effect = provider
+    real_phase = isolated["original_phase"]
+    monkeypatch.setattr(prose, "fire_phase", lambda **kw: real_phase(**{**kw, "log_path": tmp_path / "phase.log"}))
+    assert (prose.main() == 0) == success
+    output = capsys.readouterr()
+    assert ("left no clean commit" in output.err) is not success
+    assert ("[done]" in output.out) == success
     isolated["runner"].invoke.assert_called_once()

@@ -75,12 +75,11 @@ ledger as ``real_llm_verdict=below_threshold`` so the operator can
 decide whether to revert or continue.
 """
 
-DEFAULT_SAMPLER_MODEL = "gemini-3-flash-preview"
+DEFAULT_SAMPLER_MODEL = "gemini-4-hydrogen-medium"
 """Independent of the writer (codex) and reviewer (claude). Per
-``feedback_writer_reviewer_split.md`` and ``feedback_gemini_models.md``,
-fall back to ``gemini-2.5-flash`` only when the dispatcher reports
-``gemini-3-flash-preview`` is unavailable — the ``audit_teaching_quality.py``
-subprocess handles that fallback path itself.
+``feedback_writer_reviewer_split.md``: the flash-tier model on the agy
+(Google) lane, admitted by the lu-machinery model catalog. The
+``audit_teaching_quality.py`` subprocess runs it.
 """
 
 

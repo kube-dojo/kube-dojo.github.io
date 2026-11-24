@@ -32,7 +32,6 @@ jobs:
         archive
         infra
         scripts
-        scripts/ab
         scripts/services-up
         services.sh
         start-claude.sh

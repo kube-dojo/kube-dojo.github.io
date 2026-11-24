@@ -116,9 +116,11 @@ not put its content into a main-checkout build: report the revision actually
 tested and use branch CI to verify a proposed change before merge. Do not claim
 a main build validates unmerged worktree edits.
 
-For Codex-from-bridge invocations use `scripts/ab`. The wrapper currently pins
-`CODEX_BRIDGE_MODE=danger`; do not duplicate contradictory sandbox defaults in
-prompts. Its guard is `scripts/ops/smoketest_ab_codex_danger.sh`.
+Agent dispatches and asks run from the installed lu-machinery release
+(`.venv/bin/python -m lu_machinery.dispatch dispatch --repo kube-dojo ...`;
+in-process callers use `lu_machinery.agent_runtime.runner.invoke`). KubeDojo
+no longer carries its own bridge or agent runtime, so do not restate sandbox
+defaults in prompts.
 
 ## MANDATORY PRE-SUBMIT CHECKLIST
 

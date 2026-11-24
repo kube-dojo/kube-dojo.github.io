@@ -30,7 +30,7 @@ and the relevant files; no service startup or full handoff is needed.
    git worktree add .worktrees/<short-name> -b codex/<short-name> main
 
 5. Work in the worktree only. Do not merge — cross-family review via
-   scripts/dispatch.py or scripts/ab; organizer merges.
+   the lu-machinery review loop; organizer merges.
 
 6. Read the full handoff file ONLY if briefing/orient leaves a narrative gap.
    Path comes from --- kubedojo:session --- (API) or --- kubedojo:handoff-path --- (fallback).

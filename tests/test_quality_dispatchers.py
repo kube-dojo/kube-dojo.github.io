@@ -52,20 +52,35 @@ def test_dispatcher_unavailable_is_runtime_error() -> None:
     assert issubclass(dispatchers.DispatcherUnavailable, RuntimeError)
 
 
+class _FakeRuntimeResult:
+    def __init__(
+        self,
+        *,
+        ok: bool = True,
+        response: str = "",
+        stderr_excerpt: str = "",
+        returncode: int | None = 0,
+        model: str | None = None,
+    ):
+        self.ok = ok
+        self.model = model
+        self.response = response
+        self.stderr_excerpt = stderr_excerpt
+        self.returncode = returncode
+
+
 def test_dispatch_result_fields_populated(monkeypatch) -> None:
-    """Dispatch surfaces stdout/stderr/returncode/duration from subprocess."""
-    import subprocess
+    """Dispatch surfaces response/stderr/returncode/duration from lu_machinery.agent_runtime."""
+    captured: dict = {}
 
-    class FakeProc:
-        stdout = "verdict output"
-        stderr = ""
-        returncode = 0
+    def fake_invoke(agent, prompt, **kwargs):
+        captured["agent"] = agent
+        captured["kwargs"] = kwargs
+        return _FakeRuntimeResult(ok=True, response="verdict output", stderr_excerpt="", returncode=0)
 
-    def fake_run(*args, **kwargs):
-        return FakeProc()
-
-    monkeypatch.setattr(subprocess, "run", fake_run)
+    monkeypatch.setattr(dispatchers, "invoke", fake_invoke)
     result = dispatchers.dispatch("gemini", "prompt", timeout=10)
+    assert captured["agent"] == "agy"
     assert result.ok is True
     assert result.stdout == "verdict output"
     assert result.returncode == 0
@@ -74,14 +89,20 @@ def test_dispatch_result_fields_populated(monkeypatch) -> None:
 
 
 def test_dispatch_raises_unavailable_on_marker(monkeypatch) -> None:
-    import subprocess
+    monkeypatch.setattr(
+        dispatchers,
+        "invoke",
+        lambda *a, **k: _FakeRuntimeResult(ok=False, response="", stderr_excerpt="Claude call budget exhausted", returncode=1),
+    )
+    with pytest.raises(dispatchers.DispatcherUnavailable):
+        dispatchers.dispatch("claude", "prompt", timeout=10)
 
-    class FakeProc:
-        stdout = ""
-        stderr = "Claude call budget exhausted"
-        returncode = 1
 
-    monkeypatch.setattr(subprocess, "run", lambda *a, **k: FakeProc())
+def test_dispatch_raises_unavailable_on_rate_limited_error(monkeypatch) -> None:
+    def raise_rl(*a, **k):
+        raise dispatchers.RateLimitedError("claude", "claude-sonnet-5-5", "429 quota")
+
+    monkeypatch.setattr(dispatchers, "invoke", raise_rl)
     with pytest.raises(dispatchers.DispatcherUnavailable):
         dispatchers.dispatch("claude", "prompt", timeout=10)
 
@@ -89,97 +110,69 @@ def test_dispatch_raises_unavailable_on_marker(monkeypatch) -> None:
 def test_dispatch_returns_failure_not_unavailable_for_real_errors(monkeypatch) -> None:
     """Non-zero exit without an unavailability marker must surface as
     ``ok=False``, not raise — caller decides retry vs FAILED."""
-    import subprocess
-
-    class FakeProc:
-        stdout = ""
-        stderr = "SyntaxError in prompt"
-        returncode = 1
-
-    monkeypatch.setattr(subprocess, "run", lambda *a, **k: FakeProc())
+    monkeypatch.setattr(
+        dispatchers,
+        "invoke",
+        lambda *a, **k: _FakeRuntimeResult(ok=False, response="", stderr_excerpt="SyntaxError in prompt", returncode=1),
+    )
     result = dispatchers.dispatch("codex", "prompt", timeout=10)
     assert result.ok is False
     assert "SyntaxError" in result.stderr
 
 
 def test_dispatch_timeout_returns_failure(monkeypatch) -> None:
-    import subprocess
-
     def raise_timeout(*a, **k):
-        raise subprocess.TimeoutExpired(cmd="fake", timeout=10)
+        raise dispatchers.AgentTimeoutError("agy", 10)
 
-    monkeypatch.setattr(subprocess, "run", raise_timeout)
+    monkeypatch.setattr(dispatchers, "invoke", raise_timeout)
     result = dispatchers.dispatch("gemini", "prompt", timeout=10)
     assert result.ok is False
     assert "timeout" in result.stderr.lower()
 
 
-def test_dispatch_passes_no_tools_for_claude_when_tools_disabled(monkeypatch) -> None:
-    """Claude writer/reviewer dispatches must propagate ``--no-tools`` so
-    the CLI returns text-only output. Without it, Claude in print mode
-    is agentic and modifies files in cwd.
-
-    Regression guard for the k8s-capa-module-1.2-argo-events smoke
-    autopsy (Apr 24): writer FAILED with ``no frontmatter delimiter
-    found`` because Claude had used Edit/Write to rewrite the worktree
-    file and returned only a summary on stdout.
-    """
-    import subprocess
+def test_dispatch_requests_read_only_tool_set_for_claude_when_tools_disabled(monkeypatch) -> None:
+    """Claude writer/reviewer dispatches must run without edit, write or shell
+    tools so the CLI returns text-only output rather than editing files in cwd.
+    Read-only mode alone still honours checkout allow rules for Claude."""
     captured: dict = {}
 
-    class FakeProc:
-        stdout = "ok"
-        stderr = ""
-        returncode = 0
+    def capture_invoke(agent, prompt, **kwargs):
+        captured["agent"] = agent
+        captured["kwargs"] = kwargs
+        return _FakeRuntimeResult(ok=True, response="ok")
 
-    def capture_run(cmd, *args, **kwargs):
-        captured["cmd"] = list(cmd)
-        return FakeProc()
-
-    monkeypatch.setattr(subprocess, "run", capture_run)
+    monkeypatch.setattr(dispatchers, "invoke", capture_invoke)
     dispatchers.dispatch("claude", "prompt", timeout=10, tools_disabled=True)
-    assert "--no-tools" in captured["cmd"]
+    assert captured["kwargs"]["mode"] == "read-only"
+    assert captured["kwargs"]["tool_config"] == {"discussion_readonly": True}
 
 
-def test_dispatch_omits_no_tools_when_not_requested(monkeypatch) -> None:
-    """Default (citation_verify, translation, etc.) must NOT pass
-    ``--no-tools`` — Claude's full tool set is needed there."""
-    import subprocess
+def test_dispatch_omits_tool_config_when_not_requested(monkeypatch) -> None:
+    """Default (citation_verify, translation, etc.) must leave tool_config=None."""
     captured: dict = {}
 
-    class FakeProc:
-        stdout = "ok"
-        stderr = ""
-        returncode = 0
+    def capture_invoke(agent, prompt, **kwargs):
+        captured["kwargs"] = kwargs
+        return _FakeRuntimeResult(ok=True, response="ok")
 
-    monkeypatch.setattr(
-        subprocess, "run",
-        lambda cmd, *a, **k: (captured.setdefault("cmd", list(cmd)), FakeProc())[1],
-    )
+    monkeypatch.setattr(dispatchers, "invoke", capture_invoke)
     dispatchers.dispatch("claude", "prompt", timeout=10)
-    assert "--no-tools" not in captured["cmd"]
+    assert captured["kwargs"]["tool_config"] is None
 
 
-def test_dispatch_no_tools_only_for_claude(monkeypatch) -> None:
-    """Codex/Gemini have no built-in agentic tools surface in
-    ``scripts.dispatch`` (Codex relies on ``--sandbox read-only``),
-    so the flag is a no-op for them. Passing it should still not crash
-    or pollute the command line.
-    """
-    import subprocess
+def test_dispatch_tools_disabled_only_for_claude(monkeypatch) -> None:
+    """Codex keeps its read-only sandbox; AGY passes no tool_config, so the
+    release provisions its bounded read-only route (a partial hand-built
+    config is refused there)."""
     captured: dict = {}
 
-    class FakeProc:
-        stdout = "ok"
-        stderr = ""
-        returncode = 0
+    def capture_invoke(agent, prompt, **kwargs):
+        captured["kwargs"] = kwargs
+        return _FakeRuntimeResult(ok=True, response="ok")
 
-    monkeypatch.setattr(
-        subprocess, "run",
-        lambda cmd, *a, **k: (captured.setdefault("cmd", list(cmd)), FakeProc())[1],
-    )
+    monkeypatch.setattr(dispatchers, "invoke", capture_invoke)
     dispatchers.dispatch("codex", "prompt", timeout=10, tools_disabled=True)
-    assert "--no-tools" not in captured["cmd"]
+    assert captured["kwargs"]["tool_config"] is None
     captured.clear()
     dispatchers.dispatch("gemini", "prompt", timeout=10, tools_disabled=True)
-    assert "--no-tools" not in captured["cmd"]
+    assert captured["kwargs"]["tool_config"] is None
