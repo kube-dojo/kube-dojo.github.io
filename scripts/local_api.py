@@ -93,8 +93,9 @@ def _primary_checkout(repo_root: Path) -> Path | None:
     answer is its own top level. For a linked worktree, the first entry of
     ``git worktree list --porcelain`` is only a candidate: Git names the
     metadata directory there when the main tree keeps its metadata apart. The
-    top level Git reports from the candidate, or else from its parent, is
-    accepted only when its git directory is the same common directory. The KubeDojo API is a
+    top level Git reports from the candidate, or else from its nearest
+    ancestor (a nested repository in between is passed over), is accepted only
+    when its git directory is the same common directory. The KubeDojo API is a
     product service and runs on the product interpreter, which does not
     install lu-machinery, so it asks Git directly. ``None`` when Git cannot
     answer or confirm, which the health check reports as critical.
@@ -117,7 +118,7 @@ def _primary_checkout(repo_root: Path) -> Path | None:
     if not first.startswith(b"worktree "):
         return None
     candidate = Path(os.fsdecode(first[len(b"worktree "):])).resolve()
-    for path in (candidate, candidate.parent):
+    for path in (candidate, *candidate.parents):
         verified = _verified_main_tree(path, common)
         if verified is not None:
             return verified
