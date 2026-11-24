@@ -23,6 +23,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import posixpath
 import re
 import subprocess
 import sys
@@ -90,65 +91,33 @@ def _module_path_for_marker(module_path: str) -> str:
     return normalized
 
 
-def _crosses_local_symlink(rel: Path) -> bool:
-    """True when a component of ``rel`` that exists in this checkout is a symlink."""
-    current = REPO
-    for part in rel.parts:
-        current = current / part
-        if os.path.islink(current):
-            return True
-        if not os.path.lexists(current):
-            return False
-    return False
-
-
 def repo_relative_module(module_path: str) -> str | None:
-    """The queue entry as a validated ``src/content/docs/...`` path, or ``None``.
+    """The queue entry if it is already a canonical module path, else ``None``.
 
-    Queue rows may name a module relative to the repository or absolutely
-    under this checkout or the primary one. An absolute entry must resolve
-    strictly (every component exists, symlinks followed, no loop) to a
-    regular file inside one of the two checkouts. A relative entry that
-    exists in this checkout gets the same treatment (so a symlink cannot
-    lead outside the checkout); one that does not exist here is kept as
-    written, because the module worktree is created from ``origin/main``.
-    The canonical repository-relative string is validated last, whichever
-    form came in: no NUL, encodable as UTF-8, no ``..``, a
-    ``src/content/docs/...md`` path. Everything downstream (budget sidecar,
+    A queue row must name its module exactly as the repository does: a
+    relative ``src/content/docs/...md`` path with no ``.`` or ``..``
+    components, no empty, duplicate or trailing slashes, no backslash, NUL or
+    character that is not UTF-8. Nothing is normalized and nothing is looked
+    up on disk, so no spelling can stand for a different file: an absolute
+    path (it would point the writer at another checkout's copy) or any other
+    spelling is refused, and the caller skips the row with
+    ``module_path_not_canonical``. Everything downstream (budget sidecar,
     writer prompt, commit check in the module worktree, source acceptance)
-    uses that one string; any failure is ``None``, which the caller turns
-    into a per-row skip.
+    uses this one string.
     """
-    path = Path(module_path)
-    if ".." in path.parts:
+    if not module_path or "\0" in module_path or "\\" in module_path:
         return None
     try:
-        candidate = path if path.is_absolute() else REPO / path
-        local = path.is_absolute() or os.path.lexists(candidate) or _crosses_local_symlink(path)
-        if local:
-            resolved = candidate.resolve(strict=True)  # symlinks followed; a loop raises
-            if not resolved.is_file():
-                return None
-            roots = (REPO.resolve(strict=True), PRIMARY_REPO.resolve(strict=True))
-    except (OSError, RuntimeError, ValueError):  # missing, loop (RuntimeError before 3.13), NUL
-        return None
-    if local:
-        for root in roots:  # this checkout first: it is nested in the primary
-            if resolved.is_relative_to(root):
-                path = resolved.relative_to(root)
-                break
-        else:
-            return None
-    rel = path.as_posix()
-    try:
-        rel.encode("utf-8")  # a lone surrogate (or a resolved non-UTF-8 name) is not portable
+        module_path.encode("utf-8")
     except UnicodeEncodeError:
         return None
-    if "\0" in rel or ".." in Path(rel).parts:
+    if module_path.startswith("/") or posixpath.normpath(module_path) != module_path:
         return None
-    if not rel.startswith("src/content/docs/") or not rel.endswith(".md"):
+    if any(part in ("", ".", "..") for part in module_path.split("/")):
         return None
-    return rel
+    if not module_path.startswith("src/content/docs/") or not module_path.endswith(".md"):
+        return None
+    return module_path
 
 
 def _module_budget_slug(module_path: str) -> str:
@@ -795,7 +764,7 @@ def main(argv: list[str] | None = None) -> int:
     for queued_path, requested_budget in queue:
         module_path = repo_relative_module(queued_path)
         if module_path is None:
-            log({"event": "module_skip", "module": queued_path, "reason": "module_path_outside_repo"})
+            log({"event": "module_skip", "module": queued_path, "reason": "module_path_not_canonical"})
             continue
         if requested_budget is not None:  # declared for visibility only; never a writer target or gate
             _write_budget_sidecar(module_path, requested_budget)
