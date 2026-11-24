@@ -318,24 +318,50 @@ def orchestrator_open_pr(slug: str, module_path: str, codex_response: str) -> in
     return pr_num
 
 
+def git_head(wt: Path) -> str | None:
+    r = subprocess.run(
+        ["git", "rev-parse", "HEAD"], cwd=wt, capture_output=True, text=True, check=False,
+    )
+    return r.stdout.strip() if r.returncode == 0 and r.stdout.strip() else None
+
+
+def writer_committed_module(wt: Path, module_path: str, head_before: str | None) -> tuple[bool, dict[str, str | None]]:
+    """True only when THIS writer run committed a change to ``module_path``.
+
+    The lu-machinery runner returns a danger-mode success without checking
+    that the run produced anything, and the pilot reuses module worktrees,
+    so an idle writer could otherwise hand back an older commit (or an
+    existing PR URL) as its own. Success needs a commit after the
+    pre-dispatch HEAD that touches the module.
+    """
+    local_head = git_head(wt)
+    detail: dict[str, str | None] = {"head_before": head_before, "local_head": local_head}
+    if head_before is None or local_head is None or local_head == head_before:
+        return False, {**detail, "reason": "no_new_commit"}
+    log = subprocess.run(
+        ["git", "log", "--format=%H", f"{head_before}..HEAD", "--", module_path],
+        cwd=wt, capture_output=True, text=True, check=False,
+    )
+    if log.returncode != 0 or not log.stdout.strip():
+        return False, {**detail, "reason": "commit_misses_module"}
+    return True, detail
+
+
 def published_head_matches(pr_num: int, wt: Path) -> tuple[bool, dict[str, str | None]]:
     """True only when the writer's local commit is the PR head on GitHub.
 
-    The lu-machinery runner returns a danger-mode success without checking
-    that a new commit reached origin (the fork's push check is gone), and a
-    PR URL in the response skips the fallback branch probe. Review must see
-    the commit the writer made, so a stale or unpublished head stops here.
+    The release runner does not check that a new commit reached origin (the
+    fork's push check is gone), and a PR URL in the response skips the
+    fallback branch probe. Review must see the commit the writer made, so a
+    stale or unpublished head stops here.
     """
-    local = subprocess.run(
-        ["git", "rev-parse", "HEAD"], cwd=wt, capture_output=True, text=True, check=False,
-    )
+    local_head = git_head(wt)
     remote = subprocess.run(
         ["gh", "pr", "view", str(pr_num), "--json", "headRefOid", "--jq", ".headRefOid"],
         cwd=wt, capture_output=True, text=True, check=False,
     )
-    local_head = local.stdout.strip() if local.returncode == 0 else None
     pr_head = remote.stdout.strip() if remote.returncode == 0 else None
-    detail = {"local_head": local_head, "pr_head": pr_head}
+    detail = {"local_head": local_head, "pr_head": pr_head, "reason": "pr_head_not_published"}
     return bool(local_head) and local_head == pr_head, detail
 
 
@@ -682,9 +708,14 @@ def main(argv: list[str] | None = None) -> int:
         except Exception as e:  # noqa: BLE001
             log({"event": "worktree_error", "module": module_path, "error": repr(e)})
             continue
+        head_before = git_head(wt)
         codex_result = dispatch_codex(module_path, wt, slug)
         if codex_result is None or not codex_result.ok:
             log({"event": "module_skip", "module": module_path, "reason": "codex_failed"})
+            continue
+        committed, commit_detail = writer_committed_module(wt, module_path, head_before)
+        if not committed:
+            log({"event": "module_skip", "module": module_path, **commit_detail})
             continue
         pr_num = find_pr_number(codex_result.response or "")
         if pr_num is None:
@@ -695,8 +726,7 @@ def main(argv: list[str] | None = None) -> int:
                 continue
         published, heads = published_head_matches(pr_num, wt)
         if not published:
-            log({"event": "module_skip", "module": module_path, "pr": pr_num,
-                 "reason": "pr_head_not_published", **heads})
+            log({"event": "module_skip", "module": module_path, "pr": pr_num, **heads})
             continue
         # Reviewer cascade. Primary defaults to claude; override via
         # KUBEDOJO_388_PRIMARY_REVIEWER (claude | agy | qwen | deepseek).

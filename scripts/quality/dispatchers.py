@@ -125,7 +125,9 @@ def dispatch(
     Raises :class:`DispatcherUnavailable` when the runtime signals a
     temporary refusal (rate limit, budget, peak hours, unavailable).
     Returns :class:`DispatchResult` with ``ok=False`` for genuine failures
-    (crashes, timeouts, non-zero exits without availability markers).
+    (crashes, timeouts, non-zero exits without availability markers) and
+    for pre-launch refusals (``dispatch_refused: ...``), such as a read-only
+    AGY ask whose product review hooks cannot load.
     """
     if agent not in VALID_AGENTS:
         raise ValueError(f"unknown agent {agent!r}; expected one of {sorted(VALID_AGENTS)}")
@@ -164,6 +166,21 @@ def dispatch(
             ok=False,
             stdout="",
             stderr=f"dispatch_runtime_error: {str(exc)[:400]}",
+            returncode=-1,
+            duration_sec=time.monotonic() - t0,
+            agent=agent,
+            model=model,
+        )
+    except ImportError as exc:
+        # The release refuses a read-only AGY ask whose product review hooks
+        # cannot load (ProductHooksError / ConfiguredModuleError, both
+        # ImportError) before launch. That is a permanent refusal, not a
+        # temporary unavailability, so it returns a handled failure and the
+        # caller's stage cleanup and state transition run.
+        return DispatchResult(
+            ok=False,
+            stdout="",
+            stderr=f"dispatch_refused: {type(exc).__name__}: {str(exc)[:400]}",
             returncode=-1,
             duration_sec=time.monotonic() - t0,
             agent=agent,

@@ -45,6 +45,8 @@ def isolated_pilot(tmp_path, monkeypatch):
         monkeypatch.setattr(pilot, f"dispatch_{name}_review", mock)
     monkeypatch.setattr(pilot, "dispatch_backfill", MagicMock(return_value=True))
     monkeypatch.setattr(pilot, "make_worktree", MagicMock(return_value=tmp_path))
+    monkeypatch.setattr(pilot, "git_head", MagicMock(return_value="base-sha"))
+    monkeypatch.setattr(pilot, "writer_committed_module", MagicMock(return_value=(True, {})))
     monkeypatch.setattr(pilot, "published_head_matches", MagicMock(return_value=(True, {})))
     monkeypatch.setattr(pilot, "post_review_comment", MagicMock())
     source_recheck = MagicMock(return_value={"status": "unverified"})

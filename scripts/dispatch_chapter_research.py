@@ -269,7 +269,7 @@ def stage_files(worktree: Path, files: list[Path]) -> list[Path]:
 
 
 def fire_dispatch(*, worktree: Path, prompt: str, task_id: str,
-                  log_path: Path, agent: str) -> int:
+                  log_path: Path, agent: str, artifact_dir: str) -> int:
     """Run the dispatch in the current process, tee output to log."""
     from lu_machinery.agent_runtime.runner import invoke
 
@@ -303,14 +303,24 @@ def fire_dispatch(*, worktree: Path, prompt: str, task_id: str,
     if not result.ok:
         return 1
     # The release runner returns a parsed success without checking that a
-    # write-mode run produced anything; the prompt's deliverable is a local
-    # commit, so a success with HEAD unmoved is a no-write run.
-    head_after = _head_sha(worktree)
-    if head_before is None or head_after is None or head_after == head_before:
-        print(f"[dispatch] {agent} reported success but made no commit "
-              f"(HEAD {head_before} -> {head_after}); treating as failure")
+    # write-mode run produced anything. The prompt's deliverable is a local
+    # commit of the chapter's contract directory, so success needs a commit
+    # after the pre-dispatch HEAD that touches that directory.
+    if not _committed_since(worktree, head_before, artifact_dir):
+        print(f"[dispatch] {agent} reported success but made no commit touching "
+              f"{artifact_dir} since HEAD {head_before}; treating as failure")
         return 1
     return 0
+
+
+def _committed_since(worktree: Path, head_before: str | None, path: str) -> bool:
+    if head_before is None:
+        return False
+    r = subprocess.run(
+        ["git", "log", "--format=%H", f"{head_before}..HEAD", "--", path],
+        cwd=worktree, capture_output=True, text=True, check=False,
+    )
+    return r.returncode == 0 and bool(r.stdout.strip())
 
 
 def _head_sha(worktree: Path) -> str | None:
@@ -365,6 +375,7 @@ def main() -> int:
         task_id=f"ch{args.ch_num:02d}-research-{args.agent}-2026-04-28",
         log_path=log_path,
         agent=args.agent,
+        artifact_dir=f"docs/research/ai-history/chapters/{args.slug}/",
     )
 
 

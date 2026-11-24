@@ -109,6 +109,10 @@ def audit_one(module_path: Path, model: str, timeout: int, force: bool) -> tuple
         return module_path, "timeout", f"timed out after {timeout}s"
     except AgentRuntimeError as exc:
         return module_path, "dispatch_error", str(exc)[:2000]
+    except ImportError as exc:
+        # Pre-launch refusal of the read-only AGY ask (product review hooks
+        # unavailable; ProductHooksError / ConfiguredModuleError).
+        return module_path, "dispatch_error", f"{type(exc).__name__}: {exc}"[:2000]
     elapsed = time.time() - t0
     if not result.ok:
         return module_path, "dispatch_error", (result.stderr_excerpt or result.response or "")[:2000]

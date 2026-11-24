@@ -1,4 +1,5 @@
 """The chapter dispatcher checks every successful output without a provider."""
+import subprocess
 import sys
 from types import ModuleType
 from unittest.mock import MagicMock
@@ -137,7 +138,7 @@ def test_recovered_commit_success_still_checks_actual_output(isolated, monkeypat
     path.write_text(body, encoding="utf-8")
     isolated["runner"].invoke.side_effect = isolated["rate_limited"]("simulated")
     committed = MagicMock(return_value=True)
-    monkeypatch.setattr(prose, "_prose_changed_since", committed)
+    monkeypatch.setattr(prose, "_prose_committed_since", committed)
     real_phase = isolated["original_phase"]
 
     def recovered(**kwargs):
@@ -154,19 +155,30 @@ def test_recovered_commit_success_still_checks_actual_output(isolated, monkeypat
     isolated["runner"].invoke.assert_called_once()
 
 
-@pytest.mark.parametrize(("rewrite", "success"), [(False, False), (True, True)])
-def test_phase_success_without_artifact_change_fails(isolated, monkeypatch, tmp_path, capsys, rewrite, success):
-    """Defect class: a writer reports success but this phase left the chapter
-    artifact unchanged (the headless no-write flake the release runner no
-    longer catches), so the pipeline must not advance on it."""
+def _git(cwd, *args):
+    subprocess.run(["git", "-c", "user.name=t", "-c", "user.email=t@example.invalid", *args],
+                   cwd=cwd, check=True, capture_output=True)
+
+
+@pytest.mark.parametrize(("writer", "success"), [("idle", False), ("uncommitted", False), ("committed", True)])
+def test_phase_success_without_artifact_change_fails(isolated, monkeypatch, tmp_path, capsys, writer, success):
+    """Defect class: a writer reports success but this phase left no clean
+    commit of the chapter (no write at all, or bytes written but never
+    committed, which the later push would leave behind), so the pipeline
+    must not advance on it."""
     arguments(monkeypatch, phases="agy")
     path = isolated["path"]
     path.parent.mkdir(parents=True)
     path.write_text("stub", encoding="utf-8")
+    _git(tmp_path, "init", "-q")
+    _git(tmp_path, "add", "-A")
+    _git(tmp_path, "commit", "-q", "-m", "stub")
 
     def provider(*args, **kwargs):
-        if rewrite:
+        if writer != "idle":
             path.write_text("one two", encoding="utf-8")
+        if writer == "committed":
+            _git(tmp_path, "commit", "-q", "-am", "draft")
         return MagicMock(ok=True, response="done", session_id=None, stderr_excerpt="")
 
     isolated["runner"].invoke.side_effect = provider
@@ -174,6 +186,6 @@ def test_phase_success_without_artifact_change_fails(isolated, monkeypatch, tmp_
     monkeypatch.setattr(prose, "fire_phase", lambda **kw: real_phase(**{**kw, "log_path": tmp_path / "phase.log"}))
     assert (prose.main() == 0) == success
     output = capsys.readouterr()
-    assert ("unchanged since the phase started" in output.err) is not success
+    assert ("left no clean commit" in output.err) is not success
     assert ("[done]" in output.out) == success
     isolated["runner"].invoke.assert_called_once()
