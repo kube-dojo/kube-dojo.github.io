@@ -161,25 +161,33 @@ def _git(cwd, *args):
 
 
 @pytest.mark.parametrize(("writer", "success"), [
-    ("idle", False), ("uncommitted", False), ("reverted", False), ("committed", True),
+    ("idle", False), ("uncommitted", False), ("reverted", False), ("rollback", False),
+    ("other_branch", False), ("committed", True),
 ])
 def test_phase_success_without_artifact_change_fails(isolated, monkeypatch, tmp_path, capsys, writer, success):
-    """Defect class: a writer reports success but this phase left no net,
-    clean commit of the chapter (no write at all; bytes written but never
-    committed, which the later push would leave behind; or a commit followed
-    by its reversal), so the pipeline must not advance on it."""
+    """Defect class: a writer reports success but this phase left no new, net,
+    clean commit of the chapter on the worktree's branch (no write at all;
+    bytes written but never committed, which the later push would leave
+    behind; a commit followed by its reversal; a reset to an older commit; or
+    a commit on another branch), so the pipeline must not advance on it."""
     arguments(monkeypatch, phases="agy")
     path = isolated["path"]
     path.parent.mkdir(parents=True)
-    path.write_text("stub", encoding="utf-8")
-    _git(tmp_path, "init", "-q")
+    _git(tmp_path, "init", "-q", "-b", "test-branch")
+    path.write_text("old", encoding="utf-8")
     _git(tmp_path, "add", "-A")
-    _git(tmp_path, "commit", "-q", "-m", "stub")
+    _git(tmp_path, "commit", "-q", "-m", "old")
+    path.write_text("stub", encoding="utf-8")
+    _git(tmp_path, "commit", "-q", "-am", "stub")
 
     def provider(*args, **kwargs):
-        if writer != "idle":
+        if writer == "rollback":
+            _git(tmp_path, "reset", "-q", "--hard", "HEAD~1")
+        if writer == "other_branch":
+            _git(tmp_path, "checkout", "-q", "-b", "elsewhere")
+        if writer in ("uncommitted", "reverted", "other_branch", "committed"):
             path.write_text("one two", encoding="utf-8")
-        if writer in ("committed", "reverted"):
+        if writer in ("reverted", "other_branch", "committed"):
             _git(tmp_path, "commit", "-q", "-am", "draft")
         if writer == "reverted":
             path.write_text("stub", encoding="utf-8")

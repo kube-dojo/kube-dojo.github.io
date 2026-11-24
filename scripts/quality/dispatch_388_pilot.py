@@ -331,15 +331,23 @@ def writer_committed_module(wt: Path, module_path: str, head_before: str | None)
     The lu-machinery runner returns a danger-mode success without checking
     that the run produced anything, and the pilot reuses module worktrees,
     so an idle writer could otherwise hand back an older commit (or an
-    existing PR URL) as its own. Success needs the module at HEAD to differ
-    from the module at the pre-dispatch HEAD (a commit followed by its
-    reversal is no change) and the module to exist at HEAD. ``local_head``
-    in the detail is the head that was checked; review must see exactly it.
+    existing PR URL) as its own. Success needs HEAD to be a strict
+    descendant of the pre-dispatch HEAD (a reset to an older commit is no
+    new work), the module at HEAD to differ from the module at the
+    pre-dispatch HEAD (a commit followed by its reversal is no change), and
+    the module to exist at HEAD. ``local_head`` in the detail is the head
+    that was checked; review must see exactly it.
     """
     local_head = git_head(wt)
     detail: dict[str, str | None] = {"head_before": head_before, "local_head": local_head}
     if head_before is None or local_head is None or local_head == head_before:
         return False, {**detail, "reason": "no_new_commit"}
+    descendant = subprocess.run(
+        ["git", "merge-base", "--is-ancestor", head_before, local_head],
+        cwd=wt, capture_output=True, text=True, check=False,
+    )
+    if descendant.returncode != 0:
+        return False, {**detail, "reason": "head_not_descendant"}
     for argv in (
         ["git", "diff", "--name-only", head_before, local_head, "--", module_path],
         ["git", "ls-tree", "-r", "--name-only", local_head, "--", module_path],

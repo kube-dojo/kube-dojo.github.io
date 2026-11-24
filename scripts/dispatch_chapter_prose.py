@@ -426,46 +426,54 @@ def setup_worktree(*, ch_num: int, slug: str) -> tuple[Path, str]:
     return worktree, branch
 
 
-def _git_head(worktree: Path) -> str | None:
+def _git_rev(worktree: Path, rev: str) -> str | None:
     r = subprocess.run(
-        ["git", "rev-parse", "HEAD"],
+        ["git", "rev-parse", "--verify", "--quiet", f"{rev}^{{commit}}"],
         cwd=worktree, capture_output=True, text=True, check=False,
     )
     return r.stdout.strip() if r.returncode == 0 and r.stdout.strip() else None
 
 
-def _prose_committed_since(worktree: Path, prose_path: str, head_before: str | None) -> bool:
-    """True only if THIS phase left a net committed change to the chapter.
+def _prose_committed_since(worktree: Path, prose_path: str, branch: str,
+                           head_before: str | None) -> bool:
+    """True only if THIS phase left a new, net, clean commit of the chapter on ``branch``.
 
-    Every phase's deliverable is a local commit of ``prose_path`` (the
-    prompts say so, and the branch is pushed afterwards). The lu-machinery
+    Every phase's deliverable is a local commit of ``prose_path`` on the
+    worktree's branch, which is pushed by name afterwards. The lu-machinery
     runner reports a parsed provider success without checking that a
     write-mode run produced anything (the fork's guard for the headless
-    no-write flake, #2099, is gone), so success needs the chapter at HEAD to
-    differ from the chapter at the phase-start HEAD (a commit followed by
-    its reversal is no change), the chapter to exist at HEAD, and no
-    uncommitted chapter bytes a push would leave behind. Comparing against
-    the phase start, not ``main``, keeps an earlier phase's commit from
-    passing for a later phase that did nothing. The same check recovers
-    agents that finish their write + commit but then fail their final
-    streaming response (Gemini's 429-on-summary pattern, Ch07 2026-04-28).
+    no-write flake, #2099, is gone). So success needs: the branch tip (the
+    checked commit, also HEAD) to be a strict descendant of the phase-start
+    tip (a reset to an older commit or a commit elsewhere is no new work);
+    the chapter at the checked commit to differ from the phase start (a
+    commit followed by its reversal is no change) and to exist there; and
+    no uncommitted chapter bytes a push would leave behind. The same check
+    recovers agents that finish their write + commit but then fail their
+    final streaming response (Gemini's 429-on-summary pattern, Ch07
+    2026-04-28).
     """
-    if head_before is None:
+    final = _git_rev(worktree, f"refs/heads/{branch}")
+    if head_before is None or final is None or final == head_before:
+        return False
+    if _git_rev(worktree, "HEAD") != final:
         return False
     checks = (
-        (["git", "diff", "--name-only", head_before, "HEAD", "--", prose_path], True),
-        (["git", "ls-tree", "-r", "--name-only", "HEAD", "--", prose_path], True),
+        (["git", "merge-base", "--is-ancestor", head_before, final], None),
+        (["git", "diff", "--name-only", head_before, final, "--", prose_path], True),
+        (["git", "ls-tree", "-r", "--name-only", final, "--", prose_path], True),
         (["git", "status", "--porcelain", "--", prose_path], False),
     )
     for argv, want_output in checks:
         r = subprocess.run(argv, cwd=worktree, capture_output=True, text=True, check=False)
-        if r.returncode != 0 or bool(r.stdout.strip()) is not want_output:
+        if r.returncode != 0:
+            return False
+        if want_output is not None and bool(r.stdout.strip()) is not want_output:
             return False
     return True
 
 
 def fire_phase(*, agent: str, prompt: str, worktree: Path, task_id: str,
-               log_path: Path, prose_path: str) -> bool:
+               log_path: Path, prose_path: str, branch: str) -> bool:
     from lu_machinery.agent_runtime.errors import AgentTimeoutError, RateLimitedError
     from lu_machinery.agent_runtime.runner import invoke
 
@@ -498,7 +506,7 @@ def fire_phase(*, agent: str, prompt: str, worktree: Path, task_id: str,
         raise ValueError(agent)
 
     print(f"[fire] {agent} ({model}, mode={mode}) on {task_id}")
-    head_before = _git_head(worktree)
+    head_before = _git_rev(worktree, f"refs/heads/{branch}")
     try:
         r = invoke(
             agent, prompt,
@@ -521,17 +529,17 @@ def fire_phase(*, agent: str, prompt: str, worktree: Path, task_id: str,
         response = ""
         session_id = None
         stderr_excerpt = f"{type(exc).__name__}: {exc}"
-        if _prose_committed_since(worktree, prose_path, head_before):
+        if _prose_committed_since(worktree, prose_path, branch, head_before):
             print(f"[fire] {agent} runner classified failure but this phase "
                   f"committed {prose_path} — treating as success")
             ok = True
     else:
-        if ok and not _prose_committed_since(worktree, prose_path, head_before):
+        if ok and not _prose_committed_since(worktree, prose_path, branch, head_before):
             ok = False
             stderr_excerpt = (
                 f"{agent} reported success but this phase left no clean commit "
-                f"of {prose_path} (no commit since the phase started, or "
-                f"uncommitted chapter changes); retry"
+                f"of {prose_path} on {branch} (no new descendant commit that "
+                f"changes it, or uncommitted chapter changes); retry"
             )
             print(f"[fire] {stderr_excerpt}", file=sys.stderr)
 
@@ -634,7 +642,7 @@ def main() -> int:
             ok = fire_phase(
                 agent="agy", prompt=prompt, worktree=worktree,
                 task_id=f"prose-{args.slug}-agy", log_path=log,
-                prose_path=prose_path,
+                prose_path=prose_path, branch=branch,
             )
             if not ok:
                 print("[main] agy phase FAILED, stopping pipeline")
@@ -649,7 +657,7 @@ def main() -> int:
             ok = fire_phase(
                 agent="codex", prompt=prompt, worktree=worktree,
                 task_id=f"prose-{args.slug}-codex", log_path=log,
-                prose_path=prose_path,
+                prose_path=prose_path, branch=branch,
             )
             if not ok:
                 print("[main] Codex expansion FAILED")
@@ -664,7 +672,7 @@ def main() -> int:
             ok = fire_phase(
                 agent="claude", prompt=prompt, worktree=worktree,
                 task_id=f"prose-{args.slug}-claude", log_path=log,
-                prose_path=prose_path,
+                prose_path=prose_path, branch=branch,
             )
             if not ok:
                 print("[main] Claude expansion FAILED")

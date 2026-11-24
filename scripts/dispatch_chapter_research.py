@@ -269,7 +269,7 @@ def stage_files(worktree: Path, files: list[Path]) -> list[Path]:
 
 
 def fire_dispatch(*, worktree: Path, prompt: str, task_id: str,
-                  log_path: Path, agent: str, artifact_dir: str) -> int:
+                  log_path: Path, agent: str, artifact_dir: str, branch: str) -> int:
     """Run the dispatch in the current process, tee output to log."""
     from lu_machinery.agent_runtime.runner import invoke
 
@@ -277,7 +277,7 @@ def fire_dispatch(*, worktree: Path, prompt: str, task_id: str,
     model = cfg["model"]
     timeout = int(cfg["hard_timeout"])  # type: ignore[arg-type]
     print(f"[dispatch] firing {agent} ({model}) on {task_id} ...")
-    head_before = _head_sha(worktree)
+    head_before = _rev(worktree, f"refs/heads/{branch}")
     result = invoke(
         agent,
         prompt,
@@ -306,33 +306,38 @@ def fire_dispatch(*, worktree: Path, prompt: str, task_id: str,
     # write-mode run produced anything. The prompt's deliverable is a local
     # commit of the chapter's contract directory, so success needs a net
     # committed change there since the pre-dispatch HEAD.
-    if not _committed_since(worktree, head_before, artifact_dir):
-        print(f"[dispatch] {agent} reported success but left no net committed "
-              f"change under {artifact_dir} since HEAD {head_before}; treating as failure")
+    if not _committed_since(worktree, head_before, artifact_dir, branch):
+        print(f"[dispatch] {agent} reported success but left no new commit on "
+              f"{branch} with a net change under {artifact_dir} since "
+              f"{head_before}; treating as failure")
         return 1
     return 0
 
 
-def _committed_since(worktree: Path, head_before: str | None, path: str) -> bool:
-    """A net committed change under ``path`` since ``head_before`` that is present at HEAD.
+def _committed_since(worktree: Path, head_before: str | None, path: str, branch: str) -> bool:
+    """A new commit on ``branch`` with a net change under ``path``, present there.
 
-    A commit followed by its reversal is no change.
+    The branch tip must be a strict descendant of ``head_before`` (a reset to
+    an older commit or a commit on another branch is no new work), and a
+    commit followed by its reversal is no change.
     """
-    if head_before is None:
+    final = _rev(worktree, f"refs/heads/{branch}")
+    if head_before is None or final is None or final == head_before:
         return False
-    for argv in (
-        ["git", "diff", "--name-only", head_before, "HEAD", "--", path],
-        ["git", "ls-tree", "-r", "--name-only", "HEAD", "--", path],
+    for argv, want_output in (
+        (["git", "merge-base", "--is-ancestor", head_before, final], False),
+        (["git", "diff", "--name-only", head_before, final, "--", path], True),
+        (["git", "ls-tree", "-r", "--name-only", final, "--", path], True),
     ):
         r = subprocess.run(argv, cwd=worktree, capture_output=True, text=True, check=False)
-        if r.returncode != 0 or not r.stdout.strip():
+        if r.returncode != 0 or (want_output and not r.stdout.strip()):
             return False
     return True
 
 
-def _head_sha(worktree: Path) -> str | None:
+def _rev(worktree: Path, rev: str) -> str | None:
     r = subprocess.run(
-        ["git", "rev-parse", "HEAD"],
+        ["git", "rev-parse", "--verify", "--quiet", f"{rev}^{{commit}}"],
         cwd=worktree, capture_output=True, text=True, check=False,
     )
     return r.stdout.strip() if r.returncode == 0 and r.stdout.strip() else None
@@ -358,7 +363,7 @@ def main() -> int:
     print(f"[main] Ch{args.ch_num:02d} `{args.slug}` "
           f"(Part {part_num}, agent={args.agent})")
 
-    worktree, _ = setup_worktree(args.ch_num, args.agent)
+    worktree, branch = setup_worktree(args.ch_num, args.agent)
     staging_files = stage_files(
         worktree,
         [Path(s) if Path(s).is_absolute() else (REPO / s) for s in args.stage],
@@ -383,6 +388,7 @@ def main() -> int:
         log_path=log_path,
         agent=args.agent,
         artifact_dir=f"docs/research/ai-history/chapters/{args.slug}/",
+        branch=branch,
     )
 
 

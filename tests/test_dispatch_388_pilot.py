@@ -394,18 +394,20 @@ def test_dispatch_agy_review_invoke_exception_returns_error(
 
 
 @pytest.mark.parametrize(
-    ("heads", "changed", "reason"),
+    ("heads", "descendant", "changed", "reason"),
     [
-        (["base-sha", "local-sha"], True, "pr_head_not_published"),
-        (["base-sha", "base-sha"], True, "no_new_commit"),
-        (["base-sha", "local-sha"], False, "no_net_module_change"),
+        (["base-sha", "local-sha"], True, True, "pr_head_not_published"),
+        (["base-sha", "base-sha"], True, True, "no_new_commit"),
+        (["base-sha", "older-sha"], False, True, "head_not_descendant"),
+        (["base-sha", "local-sha"], True, False, "no_net_module_change"),
     ],
 )
-def test_main_skips_review_when_local_head_not_published(tmp_path, heads, changed, reason):
+def test_main_skips_review_when_local_head_not_published(tmp_path, heads, descendant, changed, reason):
     """Defect class: the module advances to review although this writer run's
     commit is not the published PR head: a stale or unpushed remote, an idle
     writer in a reused worktree handing back the older, already published
-    commit, or new commits that net to no change of the module."""
+    commit, a reset to an older commit, or new commits that net to no change
+    of the module."""
     queue = tmp_path / "queue.txt"
     queue.write_text("src/content/docs/k8s/cka/module-1.md")
     codex_result = MagicMock(ok=True, response="Opened PR: https://github.com/org/repo/pull/42")
@@ -415,6 +417,8 @@ def test_main_skips_review_when_local_head_not_published(tmp_path, heads, change
     def fake_run(cmd, **kwargs):
         if cmd[:2] == ["git", "rev-parse"]:
             return _mock_run(0, next(rev_parse) + "\n")
+        if cmd[:3] == ["git", "merge-base", "--is-ancestor"]:
+            return _mock_run(0 if descendant else 1)
         if cmd[:2] in (["git", "diff"], ["git", "ls-tree"]):
             return _mock_run(0, "src/content/docs/k8s/cka/module-1.md\n" if changed else "")
         assert cmd[:3] == ["gh", "pr", "view"]
