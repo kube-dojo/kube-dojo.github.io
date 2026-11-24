@@ -28,6 +28,9 @@ tiers:
     - iso.org
     - w3.org
     - oasis-open.org
+    - iana.org            # official IANA Internet protocol and port registries
+    - pubs.opengroup.org  # official POSIX / Single UNIX Specification publications
+    - yaml.org            # official YAML language specification
     - arxiv.org
     - acm.org
     - ieee.org
@@ -44,11 +47,19 @@ tiers:
     - apache.org
     - gnu.org             # official Bash/Coreutils manuals and release archives
     - openbsd.org         # official OpenBSD/OpenSSH manual pages
+    - man7.org            # official Linux man-pages project
+    - manpages.ubuntu.com # official Ubuntu distribution manual pages
+    - manpages.debian.org # official Debian distribution manual pages
+    - docs.kernel.org     # official Linux kernel documentation
+    - nano-editor.org     # official GNU nano editor documentation
+    - curl.se             # official curl project documentation
+    - nginx.org           # official NGINX upstream project documentation
     - git-scm.com         # official Git command documentation
     - linuxfoundation.org
     - cloudnative.io
     - docs.cloudfoundry.org # official Cloud Foundry docs, for its own capabilities
     - opencontainers.org
+    - containerd.io       # official containerd CNCF project documentation
     - helm.sh
     - istio.io
     - prometheus.io
@@ -77,6 +88,8 @@ tiers:
                           # vendor evidence, not independent competitor evidence
     - learn.microsoft.com
     - azure.microsoft.com
+    - support.microsoft.com # official Microsoft support documentation, for Microsoft's own products
+    - developer.apple.com # official Apple developer documentation, for Apple's own platforms
     - redhat.com
     - docs.openshift.com
     - ibm.com
