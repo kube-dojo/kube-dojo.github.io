@@ -21,6 +21,13 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
 
+      - name: Set up Python
+        # The scripts below are stdlib-only; pin the interpreter instead of the
+        # runner image's system python3.
+        uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0  # v7.1.0
+        with:
+          python-version-file: .python-version
+
       - name: Compute changed Ukrainian files (drop metadata-only)
         env:
           BASE_REF: ${{ github.base_ref }}

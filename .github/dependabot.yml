@@ -1,10 +1,10 @@
 version: 2
 updates:
-  # Python dependencies
-  - package-ecosystem: "pip"
-    directories:
-      - "/"
-      - "/.github/requirements"
+  # Python dependencies (pyproject.toml + uv.lock, including the zizmor group).
+  # requirements-machinery.lock is the lu-machinery consumer lock; it moves only
+  # with a machinery release adoption, never through Dependabot.
+  - package-ecosystem: "uv"
+    directory: "/"
     schedule:
       interval: "weekly"
     open-pull-requests-limit: 10
@@ -14,7 +14,7 @@ updates:
       default-days: 7
     groups:
       # Batch minor/patch bumps into one PR to cut review noise; majors stay separate.
-      pip-minor-patch:
+      uv-minor-patch:
         update-types:
           - "minor"
           - "patch"

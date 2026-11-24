@@ -1,0 +1,30 @@
+[project]
+name = "kube-dojo"
+version = "0"
+description = "KubeDojo curriculum site tooling (scripts/ and tests/); not a distributable package"
+requires-python = ">=3.14"
+# Runtime imports of scripts/. uv.lock pins every version with hashes; change a
+# requirement here, then run `uv lock` (never edit uv.lock by hand). Install
+# with `uv sync --locked`, which refuses a lock that no longer matches.
+dependencies = [
+    "jinja2>=3.1.6",
+    "psutil>=7.2.2",
+    "pyyaml>=6.0.3",
+]
+
+[dependency-groups]
+# Local contributor tools; `uv sync` installs this group by default.
+dev = [
+    "pytest>=9.1.1",
+    "ruff>=0.17.4",
+]
+# .github/workflows/zizmor.yml installs only this group (uv sync --only-group zizmor).
+zizmor = ["zizmor==1.25.2"]
+
+[tool.uv]
+# Scripts and tests run from the checkout; there is nothing to build or install.
+package = false
+# One uv release writes and reads uv.lock; workflows install this version.
+required-version = "==0.13.9"
+# Resolve only releases at least 7 days old (same window as Dependabot cooldown).
+exclude-newer = "7 days"

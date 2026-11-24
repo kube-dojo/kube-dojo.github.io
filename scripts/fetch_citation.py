@@ -55,7 +55,7 @@ try:
 except ImportError as _exc:  # pragma: no cover
     raise RuntimeError(
         "PyYAML is required for the citation allowlist. Install with "
-        "`.venv/bin/pip install pyyaml` and run pipeline scripts via "
+        "`uv sync --locked` and run pipeline scripts via "
         "`.venv/bin/python`. Silent fallback previously caused 100% of "
         "URLs to be rejected as off_allowlist — see session 8 handoff."
     ) from _exc

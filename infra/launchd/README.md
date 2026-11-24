@@ -40,7 +40,7 @@ ls -la .pipeline/launchd-logs/
 
 ## Troubleshooting
 
-- `.venv/bin/python` must exist (run `python3 -m venv .venv && .venv/bin/pip install -r requirements.txt` if missing).
+- `.venv/bin/python` must exist (run `uv sync --locked` from the repository root if missing; it installs the Python in `.python-version` and the hash-pinned `uv.lock`).
 - Gemini OAuth creds must be live (`~/.gemini/oauth_creds.json` or whatever `dispatch_gemini_with_retry` uses).
 - launchd jobs run with a stripped environment -- anything not in `EnvironmentVariables` is unavailable.
 - To trigger a job manually for testing: `launchctl start com.kubedojo.uk-divergence-detect`.

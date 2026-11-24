@@ -28,7 +28,7 @@ try:
     import yaml
 except ImportError as exc:  # pragma: no cover - import guard for local envs
     raise SystemExit(
-        "PyYAML is required. Install it with `pip install -r requirements.txt` "
+        "PyYAML is required. Install it with `uv sync --locked` "
         "or use a project virtualenv before running this script."
     ) from exc
 
