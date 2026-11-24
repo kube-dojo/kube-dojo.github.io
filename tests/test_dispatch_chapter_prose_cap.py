@@ -162,14 +162,16 @@ def _git(cwd, *args):
 
 @pytest.mark.parametrize(("writer", "success"), [
     ("idle", False), ("uncommitted", False), ("reverted", False), ("rollback", False),
-    ("other_branch", False), ("committed", True),
+    ("other_branch", False), ("fast_forward_prior", False), ("committed", True),
 ])
 def test_phase_success_without_artifact_change_fails(isolated, monkeypatch, tmp_path, capsys, writer, success):
     """Defect class: a writer reports success but this phase left no new, net,
     clean commit of the chapter on the worktree's branch (no write at all;
     bytes written but never committed, which the later push would leave
-    behind; a commit followed by its reversal; a reset to an older commit; or
-    a commit on another branch), so the pipeline must not advance on it."""
+    behind; a commit followed by its reversal; a reset to an older commit; a
+    commit on another branch; or a fast-forward to output that existed before
+    the phase, such as an earlier run's branch), so the pipeline must not
+    advance on it."""
     arguments(monkeypatch, phases="agy")
     path = isolated["path"]
     path.parent.mkdir(parents=True)
@@ -179,8 +181,14 @@ def test_phase_success_without_artifact_change_fails(isolated, monkeypatch, tmp_
     _git(tmp_path, "commit", "-q", "-m", "old")
     path.write_text("stub", encoding="utf-8")
     _git(tmp_path, "commit", "-q", "-am", "stub")
+    _git(tmp_path, "checkout", "-q", "-b", "prior-output")
+    path.write_text("prior output", encoding="utf-8")
+    _git(tmp_path, "commit", "-q", "-am", "prior output")
+    _git(tmp_path, "checkout", "-q", "test-branch")
 
     def provider(*args, **kwargs):
+        if writer == "fast_forward_prior":
+            _git(tmp_path, "merge", "-q", "--ff-only", "prior-output")
         if writer == "rollback":
             _git(tmp_path, "reset", "-q", "--hard", "HEAD~1")
         if writer == "other_branch":

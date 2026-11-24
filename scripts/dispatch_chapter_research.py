@@ -29,10 +29,15 @@ from __future__ import annotations
 import argparse
 import shutil
 import subprocess
+import sys
 from pathlib import Path
 from textwrap import dedent
 
 _CHECKOUT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(_CHECKOUT / "scripts"))
+
+from quality.writer_commit import produced, snapshot
+
 # The primary checkout: dispatch worktrees live under <primary>/.worktrees/.
 REPO = (
     Path(*_CHECKOUT.parts[: _CHECKOUT.parts.index(".worktrees")])
@@ -277,7 +282,7 @@ def fire_dispatch(*, worktree: Path, prompt: str, task_id: str,
     model = cfg["model"]
     timeout = int(cfg["hard_timeout"])  # type: ignore[arg-type]
     print(f"[dispatch] firing {agent} ({model}) on {task_id} ...")
-    head_before = _rev(worktree, f"refs/heads/{branch}")
+    before = snapshot(worktree, f"refs/heads/{branch}")
     result = invoke(
         agent,
         prompt,
@@ -304,43 +309,14 @@ def fire_dispatch(*, worktree: Path, prompt: str, task_id: str,
         return 1
     # The release runner returns a parsed success without checking that a
     # write-mode run produced anything. The prompt's deliverable is a local
-    # commit of the chapter's contract directory, so success needs a net
-    # committed change there since the pre-dispatch HEAD.
-    if not _committed_since(worktree, head_before, artifact_dir, branch):
-        print(f"[dispatch] {agent} reported success but left no new commit on "
-              f"{branch} with a net change under {artifact_dir} since "
-              f"{head_before}; treating as failure")
+    # commit of the chapter's contract directory on the worktree branch; the
+    # shared rule decides whether the branch tip holds new work there.
+    _final, reason = produced(worktree, before, artifact_dir, f"refs/heads/{branch}")
+    if reason is not None:
+        print(f"[dispatch] {agent} reported success but {branch} holds no new "
+              f"committed work under {artifact_dir} ({reason}); treating as failure")
         return 1
     return 0
-
-
-def _committed_since(worktree: Path, head_before: str | None, path: str, branch: str) -> bool:
-    """A new commit on ``branch`` with a net change under ``path``, present there.
-
-    The branch tip must be a strict descendant of ``head_before`` (a reset to
-    an older commit or a commit on another branch is no new work), and a
-    commit followed by its reversal is no change.
-    """
-    final = _rev(worktree, f"refs/heads/{branch}")
-    if head_before is None or final is None or final == head_before:
-        return False
-    for argv, want_output in (
-        (["git", "merge-base", "--is-ancestor", head_before, final], False),
-        (["git", "diff", "--name-only", head_before, final, "--", path], True),
-        (["git", "ls-tree", "-r", "--name-only", final, "--", path], True),
-    ):
-        r = subprocess.run(argv, cwd=worktree, capture_output=True, text=True, check=False)
-        if r.returncode != 0 or (want_output and not r.stdout.strip()):
-            return False
-    return True
-
-
-def _rev(worktree: Path, rev: str) -> str | None:
-    r = subprocess.run(
-        ["git", "rev-parse", "--verify", "--quiet", f"{rev}^{{commit}}"],
-        cwd=worktree, capture_output=True, text=True, check=False,
-    )
-    return r.stdout.strip() if r.returncode == 0 and r.stdout.strip() else None
 
 
 def main() -> int:

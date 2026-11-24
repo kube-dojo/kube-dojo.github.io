@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import json
 import re
+import subprocess
 import sys
 from pathlib import Path
 from unittest.mock import MagicMock, patch
@@ -134,7 +135,7 @@ def test_main_approve_holds_merge_and_backfill_for_all_queued_items(tmp_path, ca
          patch.object(pilot.subprocess, "run", side_effect=AssertionError("unexpected subprocess")), \
          patch("scripts.quality.dispatch_388_pilot.make_worktree", return_value=tmp_path), \
          patch("scripts.quality.dispatch_388_pilot.dispatch_codex", return_value=codex_result), \
-         patch("scripts.quality.dispatch_388_pilot.git_head", return_value="base-sha"), \
+         patch("scripts.quality.dispatch_388_pilot.writer_snapshot", return_value=None), \
          patch("scripts.quality.dispatch_388_pilot.writer_committed_module", return_value=(True, {})), \
          patch("scripts.quality.dispatch_388_pilot.published_head_matches", return_value=(True, {})), \
          patch("scripts.quality.dispatch_388_pilot.build_reviewer_cascade", return_value=[("claude", reviewer)]), \
@@ -194,7 +195,7 @@ def test_main_nonapprove_verdicts_remain_held(tmp_path, verdict, expected_event)
          patch.object(pilot.subprocess, "run", side_effect=AssertionError("unexpected subprocess")), \
          patch("scripts.quality.dispatch_388_pilot.make_worktree", return_value=tmp_path), \
          patch("scripts.quality.dispatch_388_pilot.dispatch_codex", return_value=codex_result), \
-         patch("scripts.quality.dispatch_388_pilot.git_head", return_value="base-sha"), \
+         patch("scripts.quality.dispatch_388_pilot.writer_snapshot", return_value=None), \
          patch("scripts.quality.dispatch_388_pilot.writer_committed_module", return_value=(True, {})), \
          patch("scripts.quality.dispatch_388_pilot.published_head_matches", return_value=(True, {})), \
          patch("scripts.quality.dispatch_388_pilot.build_reviewer_cascade", return_value=[("claude", reviewer)]), \
@@ -393,41 +394,75 @@ def test_dispatch_agy_review_invoke_exception_returns_error(
     assert verdict == "ERROR"
 
 
+def _git(cwd, *args):
+    return subprocess.run(["git", "-c", "user.name=t", "-c", "user.email=t@example.invalid", *args],
+                          cwd=cwd, check=True, capture_output=True, text=True).stdout.strip()
+
+
 @pytest.mark.parametrize(
-    ("heads", "descendant", "changed", "reason"),
+    ("writer", "pr_head", "reason"),
     [
-        (["base-sha", "local-sha"], True, True, "pr_head_not_published"),
-        (["base-sha", "base-sha"], True, True, "no_new_commit"),
-        (["base-sha", "older-sha"], False, True, "head_not_descendant"),
-        (["base-sha", "local-sha"], True, False, "no_net_module_change"),
+        ("commit", "stale", "pr_head_not_published"),
+        ("idle", "local", "no_new_commit"),
+        ("rollback", "local", "not_descendant"),
+        ("revert", "local", "no_net_change"),
+        ("fast_forward_prior", "local", "no_new_artifact_commit"),
     ],
 )
-def test_main_skips_review_when_local_head_not_published(tmp_path, heads, descendant, changed, reason):
-    """Defect class: the module advances to review although this writer run's
-    commit is not the published PR head: a stale or unpushed remote, an idle
-    writer in a reused worktree handing back the older, already published
-    commit, a reset to an older commit, or new commits that net to no change
-    of the module."""
+def test_main_skips_review_when_local_head_not_published(tmp_path, writer, pr_head, reason):
+    """Defect class: the module advances to review although no new commit of
+    this writer run is the published PR head: a stale or unpushed remote, an
+    idle writer in a reused worktree, a reset to an older commit, a commit
+    followed by its reversal, or a fast-forward to output that existed before
+    dispatch (an earlier run's branch)."""
+    module_path = "src/content/docs/k8s/cka/module-1.md"
+    module = tmp_path / module_path
+    module.parent.mkdir(parents=True)
+    module.write_text("old\n")
+    _git(tmp_path, "init", "-q", "-b", "codex/388-pilot-k8s-cka-module-1")
+    _git(tmp_path, "add", "-A")
+    _git(tmp_path, "commit", "-q", "-m", "A")
+    module.write_text("start\n")
+    _git(tmp_path, "commit", "-q", "-am", "B")
+    _git(tmp_path, "checkout", "-q", "-b", "prior-output")
+    module.write_text("prior output\n")
+    _git(tmp_path, "commit", "-q", "-am", "C")
+    _git(tmp_path, "checkout", "-q", "codex/388-pilot-k8s-cka-module-1")
     queue = tmp_path / "queue.txt"
-    queue.write_text("src/content/docs/k8s/cka/module-1.md")
-    codex_result = MagicMock(ok=True, response="Opened PR: https://github.com/org/repo/pull/42")
+    queue.write_text(module_path)
     reviewer = MagicMock(return_value=("VERDICT: APPROVE", "APPROVE"))
-    rev_parse = iter(heads)
+
+    def writer_run(*args, **kwargs):
+        if writer in ("commit", "revert"):
+            module.write_text("draft\n")
+            _git(tmp_path, "commit", "-q", "-am", "draft")
+        if writer == "revert":
+            module.write_text("start\n")
+            _git(tmp_path, "commit", "-q", "-am", "revert")
+        if writer == "rollback":
+            _git(tmp_path, "reset", "-q", "--hard", "HEAD~1")
+        if writer == "fast_forward_prior":
+            _git(tmp_path, "merge", "-q", "--ff-only", "prior-output")
+        return MagicMock(ok=True, response="Opened PR: https://github.com/org/repo/pull/42")
+
+    real_run = subprocess.run
 
     def fake_run(cmd, **kwargs):
-        if cmd[:2] == ["git", "rev-parse"]:
-            return _mock_run(0, next(rev_parse) + "\n")
-        if cmd[:3] == ["git", "merge-base", "--is-ancestor"]:
-            return _mock_run(0 if descendant else 1)
-        if cmd[:2] in (["git", "diff"], ["git", "ls-tree"]):
-            return _mock_run(0, "src/content/docs/k8s/cka/module-1.md\n" if changed else "")
-        assert cmd[:3] == ["gh", "pr", "view"]
-        return _mock_run(0, "stale-sha\n")
+        if cmd[:2] == ["git", "ls-remote"]:
+            return _mock_run(0, "")
+        if cmd[:3] == ["gh", "pr", "view"]:
+            head = _git(tmp_path, "rev-parse", "HEAD") if pr_head == "local" else "stale-sha"
+            return _mock_run(0, head + "\n")
+        assert cmd[0] == "git", cmd
+        return real_run(cmd, **kwargs)
 
-    with patch.object(pilot, "invoke", side_effect=AssertionError("unexpected provider call")), \
+    with patch.object(pilot, "REPO", tmp_path), \
+         patch.object(pilot, "PILOT_FILE", queue), \
+         patch.object(pilot, "LOG", tmp_path / "pilot.jsonl"), \
+         patch.object(pilot, "invoke", side_effect=AssertionError("unexpected provider call")), \
          patch.object(pilot.subprocess, "run", side_effect=fake_run), \
          patch("scripts.quality.dispatch_388_pilot.make_worktree", return_value=tmp_path), \
-         patch("scripts.quality.dispatch_388_pilot.dispatch_codex", return_value=codex_result), \
+         patch("scripts.quality.dispatch_388_pilot.dispatch_codex", side_effect=writer_run), \
          patch("scripts.quality.dispatch_388_pilot.build_reviewer_cascade", return_value=[("claude", reviewer)]), \
          patch("scripts.quality.dispatch_388_pilot.post_review_comment") as mock_post_review, \
          patch("scripts.quality.dispatch_388_pilot.time.sleep"), \
@@ -439,4 +474,3 @@ def test_main_skips_review_when_local_head_not_published(tmp_path, heads, descen
     skipped = [c.args[0] for c in mock_log.call_args_list if c.args[0]["event"] == "module_skip"]
     assert len(skipped) == 1
     assert skipped[0]["reason"] == reason
-    assert skipped[0]["local_head"] == heads[-1]

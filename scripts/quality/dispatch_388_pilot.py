@@ -52,6 +52,8 @@ from lu_machinery.agent_runtime.errors import (
 )
 from lu_machinery.agent_runtime.runner import invoke
 
+from quality.writer_commit import Snapshot, produced, snapshot
+
 
 def module_slug_for_pipeline(module_path: str) -> str:
     module = Path(module_path)
@@ -318,43 +320,38 @@ def orchestrator_open_pr(slug: str, module_path: str, codex_response: str) -> in
     return pr_num
 
 
-def git_head(wt: Path) -> str | None:
-    r = subprocess.run(
-        ["git", "rev-parse", "HEAD"], cwd=wt, capture_output=True, text=True, check=False,
+def _published_branch_head(slug: str) -> str | None:
+    """The head the module's PR branch already has on GitHub, if any."""
+    ls = subprocess.run(
+        ["git", "ls-remote", "origin", f"refs/heads/codex/388-pilot-{slug}"],
+        cwd=REPO, capture_output=True, text=True, check=False,
     )
-    return r.stdout.strip() if r.returncode == 0 and r.stdout.strip() else None
+    fields = ls.stdout.split() if ls.returncode == 0 else []
+    return fields[0] if fields else None
 
 
-def writer_committed_module(wt: Path, module_path: str, head_before: str | None) -> tuple[bool, dict[str, str | None]]:
-    """True only when THIS writer run left a net committed change to ``module_path``.
+def writer_snapshot(wt: Path, slug: str) -> Snapshot:
+    """Pre-dispatch state for :func:`writer_committed_module`.
+
+    The worktree is reused across runs, so earlier output may sit on a local
+    branch, in a reflog or only on GitHub; all of it counts as prior output.
+    """
+    return snapshot(wt, "HEAD", prior_outputs=(_published_branch_head(slug),))
+
+
+def writer_committed_module(wt: Path, module_path: str, before: Snapshot) -> tuple[bool, dict[str, str | None]]:
+    """True only when THIS writer run left new committed work on ``module_path``.
 
     The lu-machinery runner returns a danger-mode success without checking
-    that the run produced anything, and the pilot reuses module worktrees,
-    so an idle writer could otherwise hand back an older commit (or an
-    existing PR URL) as its own. Success needs HEAD to be a strict
-    descendant of the pre-dispatch HEAD (a reset to an older commit is no
-    new work), the module at HEAD to differ from the module at the
-    pre-dispatch HEAD (a commit followed by its reversal is no change), and
-    the module to exist at HEAD. ``local_head`` in the detail is the head
-    that was checked; review must see exactly it.
+    that the run produced anything, and an idle writer in a reused worktree
+    could otherwise hand back earlier output (or an existing PR URL) as its
+    own. :func:`quality.writer_commit.produced` decides; ``local_head`` in the
+    detail is the commit that was checked, and review must see exactly it.
     """
-    local_head = git_head(wt)
-    detail: dict[str, str | None] = {"head_before": head_before, "local_head": local_head}
-    if head_before is None or local_head is None or local_head == head_before:
-        return False, {**detail, "reason": "no_new_commit"}
-    descendant = subprocess.run(
-        ["git", "merge-base", "--is-ancestor", head_before, local_head],
-        cwd=wt, capture_output=True, text=True, check=False,
-    )
-    if descendant.returncode != 0:
-        return False, {**detail, "reason": "head_not_descendant"}
-    for argv in (
-        ["git", "diff", "--name-only", head_before, local_head, "--", module_path],
-        ["git", "ls-tree", "-r", "--name-only", local_head, "--", module_path],
-    ):
-        r = subprocess.run(argv, cwd=wt, capture_output=True, text=True, check=False)
-        if r.returncode != 0 or not r.stdout.strip():
-            return False, {**detail, "reason": "no_net_module_change"}
+    local_head, reason = produced(wt, before, module_path)
+    detail: dict[str, str | None] = {"head_before": before.start, "local_head": local_head}
+    if reason is not None:
+        return False, {**detail, "reason": reason}
     return True, detail
 
 
@@ -718,12 +715,12 @@ def main(argv: list[str] | None = None) -> int:
         except Exception as e:  # noqa: BLE001
             log({"event": "worktree_error", "module": module_path, "error": repr(e)})
             continue
-        head_before = git_head(wt)
+        before = writer_snapshot(wt, slug)
         codex_result = dispatch_codex(module_path, wt, slug)
         if codex_result is None or not codex_result.ok:
             log({"event": "module_skip", "module": module_path, "reason": "codex_failed"})
             continue
-        committed, commit_detail = writer_committed_module(wt, module_path, head_before)
+        committed, commit_detail = writer_committed_module(wt, module_path, before)
         if not committed:
             log({"event": "module_skip", "module": module_path, **commit_detail})
             continue

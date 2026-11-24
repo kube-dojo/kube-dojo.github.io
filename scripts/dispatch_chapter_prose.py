@@ -58,6 +58,10 @@ from textwrap import dedent
 import yaml
 
 _CHECKOUT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(_CHECKOUT / "scripts"))
+
+from quality.writer_commit import Snapshot, produced, rev, snapshot
+
 # The primary checkout: dispatch worktrees live under <primary>/.worktrees/.
 REPO = (
     Path(*_CHECKOUT.parts[: _CHECKOUT.parts.index(".worktrees")])
@@ -426,49 +430,34 @@ def setup_worktree(*, ch_num: int, slug: str) -> tuple[Path, str]:
     return worktree, branch
 
 
-def _git_rev(worktree: Path, rev: str) -> str | None:
-    r = subprocess.run(
-        ["git", "rev-parse", "--verify", "--quiet", f"{rev}^{{commit}}"],
-        cwd=worktree, capture_output=True, text=True, check=False,
-    )
-    return r.stdout.strip() if r.returncode == 0 and r.stdout.strip() else None
-
-
 def _prose_committed_since(worktree: Path, prose_path: str, branch: str,
-                           head_before: str | None) -> bool:
-    """True only if THIS phase left a new, net, clean commit of the chapter on ``branch``.
+                           before: Snapshot) -> bool:
+    """True only if THIS phase left new, net, clean committed work on the chapter.
 
     Every phase's deliverable is a local commit of ``prose_path`` on the
-    worktree's branch, which is pushed by name afterwards. The lu-machinery
-    runner reports a parsed provider success without checking that a
-    write-mode run produced anything (the fork's guard for the headless
-    no-write flake, #2099, is gone). So success needs: the branch tip (the
-    checked commit, also HEAD) to be a strict descendant of the phase-start
-    tip (a reset to an older commit or a commit elsewhere is no new work);
-    the chapter at the checked commit to differ from the phase start (a
-    commit followed by its reversal is no change) and to exist there; and
-    no uncommitted chapter bytes a push would leave behind. The same check
-    recovers agents that finish their write + commit but then fail their
-    final streaming response (Gemini's 429-on-summary pattern, Ch07
-    2026-04-28).
+    worktree's branch, which is pushed by name afterwards. The shared rule in
+    :mod:`quality.writer_commit` decides whether the branch tip holds new
+    work on the chapter (it refuses idle runs, reversals, resets, fast-forwards
+    to earlier output and unrelated commits). On top of it, HEAD must be that
+    tip and no uncommitted chapter bytes may remain for the push to leave
+    behind. The same check recovers agents that finish their write + commit
+    but then fail their final streaming response (Gemini's 429-on-summary
+    pattern, Ch07 2026-04-28).
     """
-    final = _git_rev(worktree, f"refs/heads/{branch}")
-    if head_before is None or final is None or final == head_before:
+    final, reason = produced(worktree, before, prose_path, f"refs/heads/{branch}")
+    if reason is not None:
+        print(f"[fire] chapter not delivered on {branch}: {reason}", file=sys.stderr)
         return False
-    if _git_rev(worktree, "HEAD") != final:
+    if rev(worktree, "HEAD") != final:
+        print(f"[fire] chapter not delivered: HEAD is not {branch}", file=sys.stderr)
         return False
-    checks = (
-        (["git", "merge-base", "--is-ancestor", head_before, final], None),
-        (["git", "diff", "--name-only", head_before, final, "--", prose_path], True),
-        (["git", "ls-tree", "-r", "--name-only", final, "--", prose_path], True),
-        (["git", "status", "--porcelain", "--", prose_path], False),
+    status = subprocess.run(
+        ["git", "status", "--porcelain", "--", prose_path],
+        cwd=worktree, capture_output=True, text=True, check=False,
     )
-    for argv, want_output in checks:
-        r = subprocess.run(argv, cwd=worktree, capture_output=True, text=True, check=False)
-        if r.returncode != 0:
-            return False
-        if want_output is not None and bool(r.stdout.strip()) is not want_output:
-            return False
+    if status.returncode != 0 or status.stdout.strip():
+        print(f"[fire] chapter not delivered: uncommitted changes to {prose_path}", file=sys.stderr)
+        return False
     return True
 
 
@@ -506,7 +495,7 @@ def fire_phase(*, agent: str, prompt: str, worktree: Path, task_id: str,
         raise ValueError(agent)
 
     print(f"[fire] {agent} ({model}, mode={mode}) on {task_id}")
-    head_before = _git_rev(worktree, f"refs/heads/{branch}")
+    before = snapshot(worktree, f"refs/heads/{branch}")
     try:
         r = invoke(
             agent, prompt,
@@ -529,17 +518,16 @@ def fire_phase(*, agent: str, prompt: str, worktree: Path, task_id: str,
         response = ""
         session_id = None
         stderr_excerpt = f"{type(exc).__name__}: {exc}"
-        if _prose_committed_since(worktree, prose_path, branch, head_before):
+        if _prose_committed_since(worktree, prose_path, branch, before):
             print(f"[fire] {agent} runner classified failure but this phase "
                   f"committed {prose_path} — treating as success")
             ok = True
     else:
-        if ok and not _prose_committed_since(worktree, prose_path, branch, head_before):
+        if ok and not _prose_committed_since(worktree, prose_path, branch, before):
             ok = False
             stderr_excerpt = (
                 f"{agent} reported success but this phase left no clean commit "
-                f"of {prose_path} on {branch} (no new descendant commit that "
-                f"changes it, or uncommitted chapter changes); retry"
+                f"of new work on {prose_path} on {branch}; retry"
             )
             print(f"[fire] {stderr_excerpt}", file=sys.stderr)
 
