@@ -382,8 +382,8 @@ def fetch(url: str, *, refresh: bool = False, timeout: int = DEFAULT_TIMEOUT) ->
         cached = _load_cached(url)
         if cached is not None:
             final_url = cached.get("final_url")
-            cached["allowlist_tier"] = allowlist_tier(
-                final_url if isinstance(final_url, str) and final_url else url
+            cached["allowlist_tier"] = (
+                allowlist_tier(final_url) if isinstance(final_url, str) and final_url else None
             )
             return cached
 
