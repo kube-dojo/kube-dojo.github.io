@@ -37,7 +37,11 @@ import yaml
 # checkout (primary OR a worktree) without a hard-coded absolute path.
 # scripts/quality/dispatch_388_pilot.py -> repo root is parents[2].
 REPO = Path(__file__).resolve().parents[2]
-PRIMARY_REPO = REPO.parent.parent if REPO.parent.name == ".worktrees" else REPO
+# The primary checkout: dispatch worktrees live anywhere under <primary>/.worktrees/
+# (for example .worktrees/dispatch/<agent>/<task>), as in the AI-History dispatchers.
+PRIMARY_REPO = (
+    Path(*REPO.parts[: REPO.parts.index(".worktrees")]) if ".worktrees" in REPO.parts else REPO
+)
 PILOT_FILE = REPO / "scripts/quality/pilot-2026-05-02.txt"
 LOG = REPO / "logs/388_pilot_2026-05-02.jsonl"
 BRIEF = REPO / "scripts/prompts/module-rewriter-388.md"
@@ -95,15 +99,18 @@ def repo_relative_module(module_path: str) -> str | None:
     the one repository-relative form; anything else is refused.
     """
     path = Path(module_path)
+    if ".." in path.parts:
+        return None
     if path.is_absolute():
-        for root in (REPO, PRIMARY_REPO):
-            if path.is_relative_to(root):
-                path = path.relative_to(root)
+        resolved = path.resolve()  # a symlinked spelling of either checkout
+        for root in (REPO.resolve(), PRIMARY_REPO.resolve()):  # this checkout first: it is nested in the primary
+            if resolved.is_relative_to(root):
+                path = resolved.relative_to(root)
                 break
         else:
             return None
     rel = path.as_posix()
-    if ".." in path.parts or not rel.startswith("src/content/docs/") or not rel.endswith(".md"):
+    if not rel.startswith("src/content/docs/") or not rel.endswith(".md"):
         return None
     return rel
 

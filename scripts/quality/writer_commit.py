@@ -13,9 +13,9 @@ their callers prove the delivery from git state instead:
   commit only when it strictly descends from the start, at least one commit
   in its history touches the artifact and was reachable from none of the
   pre-dispatch tips (or from a known prior output such as an earlier published
-  PR head), the artifact differs both from the start and from every
-  pre-dispatch commit the new commits build on (the prior-output boundary),
-  and the artifact exists.
+  PR head), the artifact exists, and its committed content (paths and blob
+  ids; file modes are ignored) differs both from the start and from every
+  pre-dispatch commit the new commits build on (the prior-output boundary).
 
 An idle run, an uncommitted write, a commit followed by its reversal, a reset
 to an older commit, a fast-forward to output that existed before dispatch
@@ -74,6 +74,25 @@ def snapshot(worktree: Path, ref: str = "HEAD", prior_outputs: tuple[str | None,
     return Snapshot(start, tuple(sorted(tips)))
 
 
+def _content(worktree: Path, commit: str, artifact: str) -> frozenset[tuple[str, str]] | None:
+    """The artifact's committed content at ``commit``: ``(path, blob id)`` pairs.
+
+    A file artifact yields one pair, a directory one pair per file below it.
+    File modes are ignored, so an executable-bit change is not new content.
+    ``None`` means git failed.
+    """
+    r = _git(worktree, "ls-tree", "-r", "-z", commit, "--", artifact)
+    if r.returncode != 0:
+        return None
+    pairs = set()
+    for entry in r.stdout.split("\0"):
+        meta, _, path = entry.partition("\t")
+        fields = meta.split()
+        if len(fields) == 3 and fields[1] == "blob":
+            pairs.add((path, fields[2]))
+    return frozenset(pairs)
+
+
 def _known_commits(worktree: Path, shas: tuple[str, ...]) -> list[str]:
     if not shas:
         return []
@@ -108,14 +127,16 @@ def produced(worktree: Path, before: Snapshot, artifact: str, ref: str = "HEAD")
                     stdin="".join(f"^{s}\n" for s in excluded))
     if boundary.returncode != 0:
         return final, "git_error"
+    final_content = _content(worktree, final, artifact)
+    if final_content is None:
+        return final, "git_error"
+    if not final_content:
+        return final, "artifact_missing"
     bases = {before.start} | {line[1:] for line in boundary.stdout.split() if line.startswith("-")}
     for base in sorted(bases):
-        diff = _git(worktree, "diff", "--name-only", base, final, "--", artifact)
-        if diff.returncode != 0:
+        base_content = _content(worktree, base, artifact)
+        if base_content is None:
             return final, "git_error"
-        if not diff.stdout.strip():
+        if base_content == final_content:
             return final, "no_net_change"
-    tree = _git(worktree, "ls-tree", "-r", "--name-only", final, "--", artifact)
-    if tree.returncode != 0 or not tree.stdout.strip():
-        return final, "artifact_missing"
     return final, None

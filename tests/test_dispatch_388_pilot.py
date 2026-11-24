@@ -408,6 +408,7 @@ def _git(cwd, *args):
         ("revert", "local", 2, "no_net_change"),
         ("fast_forward_prior", "local", 2, "no_new_artifact_commit"),
         ("ff_edit_revert", "local", 2, "no_net_change"),
+        ("mode_only", "local", 2, "no_net_change"),
         ("commit", "local", 128, "published_baseline_unknown"),
     ],
 )
@@ -417,7 +418,8 @@ def test_main_skips_review_when_local_head_not_published(tmp_path, writer, pr_he
     idle writer in a reused worktree, a reset to an older commit, a commit
     followed by its reversal, a fast-forward to output that existed before
     dispatch (an earlier run's branch), also when followed by an edit and its
-    reversal, or a published baseline that could not be looked up."""
+    reversal, a commit that only changes the file mode, or a published
+    baseline that could not be looked up."""
     module_path = "src/content/docs/k8s/cka/module-1.md"
     module = tmp_path / module_path
     module.parent.mkdir(parents=True)
@@ -444,6 +446,9 @@ def test_main_skips_review_when_local_head_not_published(tmp_path, writer, pr_he
             _git(tmp_path, "commit", "-q", "-am", "revert")
         if writer == "rollback":
             _git(tmp_path, "reset", "-q", "--hard", "HEAD~1")
+        if writer == "mode_only":
+            module.chmod(0o755)
+            _git(tmp_path, "commit", "-q", "-am", "mode only")
         if writer in ("fast_forward_prior", "ff_edit_revert"):
             _git(tmp_path, "merge", "-q", "--ff-only", "prior-output")
         if writer == "ff_edit_revert":

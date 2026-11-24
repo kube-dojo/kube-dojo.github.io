@@ -163,7 +163,7 @@ def _git(cwd, *args):
 @pytest.mark.parametrize(("writer", "success"), [
     ("idle", False), ("uncommitted", False), ("reverted", False), ("rollback", False),
     ("other_branch", False), ("fast_forward_prior", False), ("ff_edit_revert", False),
-    ("committed", True), ("commit_after_prior", True),
+    ("mode_only", False), ("committed", True), ("commit_after_prior", True),
 ])
 def test_phase_success_without_artifact_change_fails(isolated, monkeypatch, tmp_path, capsys, writer, success):
     """Defect class: a writer reports success but this phase left no new, net,
@@ -172,8 +172,9 @@ def test_phase_success_without_artifact_change_fails(isolated, monkeypatch, tmp_
     behind; a commit followed by its reversal; a reset to an older commit; a
     commit on another branch; or a fast-forward to output that existed before
     the phase, such as an earlier run's branch, also when followed by an edit
-    and its reversal), so the pipeline must not advance on it. New work on top
-    of earlier output is still accepted."""
+    and its reversal; or a commit that only changes the file mode), so the
+    pipeline must not advance on it. New work on top of earlier output is
+    still accepted."""
     arguments(monkeypatch, phases="agy")
     path = isolated["path"]
     path.parent.mkdir(parents=True)
@@ -198,6 +199,9 @@ def test_phase_success_without_artifact_change_fails(isolated, monkeypatch, tmp_
             _git(tmp_path, "commit", "-q", "-am", "revert temporary")
         if writer == "rollback":
             _git(tmp_path, "reset", "-q", "--hard", "HEAD~1")
+        if writer == "mode_only":
+            path.chmod(0o755)
+            _git(tmp_path, "commit", "-q", "-am", "mode only")
         if writer == "other_branch":
             _git(tmp_path, "checkout", "-q", "-b", "elsewhere")
         if writer in ("uncommitted", "reverted", "other_branch", "committed", "commit_after_prior"):
