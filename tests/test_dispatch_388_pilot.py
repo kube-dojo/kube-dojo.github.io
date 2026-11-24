@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+import os
 import re
 import subprocess
 import sys
@@ -128,7 +129,8 @@ def test_main_approve_holds_merge_and_backfill_for_all_queued_items(tmp_path, ca
         module.parent.mkdir(parents=True, exist_ok=True)
         module.write_text("---\ncitations_verified: true\nrevision_pending: false\n---\nDraft\n")
 
-    with patch.object(pilot, "REPO", tmp_path), \
+    with patch.dict(os.environ, {"LU_PRODUCT_ROOT": str(tmp_path)}), \
+         patch.object(pilot, "REPO", tmp_path), \
          patch.object(pilot, "PILOT_FILE", queue), \
          patch.object(pilot, "LOG", tmp_path / "pilot.jsonl"), \
          patch.object(pilot, "invoke", side_effect=AssertionError("unexpected provider call")), \
@@ -191,7 +193,8 @@ def test_main_nonapprove_verdicts_remain_held(tmp_path, verdict, expected_event)
     codex_result = MagicMock(ok=True, response="Opened PR: https://github.com/org/repo/pull/42")
     reviewer = MagicMock(return_value=(f"VERDICT: {verdict}", verdict))
 
-    with patch.object(pilot, "invoke", side_effect=AssertionError("unexpected provider call")), \
+    with patch.dict(os.environ, {"LU_PRODUCT_ROOT": str(tmp_path)}), \
+         patch.object(pilot, "invoke", side_effect=AssertionError("unexpected provider call")), \
          patch.object(pilot.subprocess, "run", side_effect=AssertionError("unexpected subprocess")), \
          patch("scripts.quality.dispatch_388_pilot.make_worktree", return_value=tmp_path), \
          patch("scripts.quality.dispatch_388_pilot.dispatch_codex", return_value=codex_result), \
@@ -409,6 +412,7 @@ def _git(cwd, *args):
         ("fast_forward_prior", "local", 2, "no_new_artifact_commit"),
         ("ff_edit_revert", "local", 2, "no_net_change"),
         ("mode_only", "local", 2, "no_net_change"),
+        ("symlink_replaces_module", "local", 2, "artifact_type_mismatch"),
         ("commit", "local", 128, "published_baseline_unknown"),
     ],
 )
@@ -418,8 +422,9 @@ def test_main_skips_review_when_local_head_not_published(tmp_path, writer, pr_he
     idle writer in a reused worktree, a reset to an older commit, a commit
     followed by its reversal, a fast-forward to output that existed before
     dispatch (an earlier run's branch), also when followed by an edit and its
-    reversal, a commit that only changes the file mode, or a published
-    baseline that could not be looked up."""
+    reversal, a commit that only changes the file mode, a symlink committed
+    in place of the module, or a published baseline that could not be looked
+    up."""
     module_path = "src/content/docs/k8s/cka/module-1.md"
     module = tmp_path / module_path
     module.parent.mkdir(parents=True)
@@ -449,6 +454,11 @@ def test_main_skips_review_when_local_head_not_published(tmp_path, writer, pr_he
         if writer == "mode_only":
             module.chmod(0o755)
             _git(tmp_path, "commit", "-q", "-am", "mode only")
+        if writer == "symlink_replaces_module":
+            module.unlink()
+            module.symlink_to("module-elsewhere.md")
+            _git(tmp_path, "add", "-A")
+            _git(tmp_path, "commit", "-q", "-m", "symlink in place of the module")
         if writer in ("fast_forward_prior", "ff_edit_revert"):
             _git(tmp_path, "merge", "-q", "--ff-only", "prior-output")
         if writer == "ff_edit_revert":
@@ -469,7 +479,8 @@ def test_main_skips_review_when_local_head_not_published(tmp_path, writer, pr_he
         assert cmd[0] == "git", cmd
         return real_run(cmd, **kwargs)
 
-    with patch.object(pilot, "REPO", tmp_path), \
+    with patch.dict(os.environ, {"LU_PRODUCT_ROOT": str(tmp_path)}), \
+         patch.object(pilot, "REPO", tmp_path), \
          patch.object(pilot, "PILOT_FILE", queue), \
          patch.object(pilot, "LOG", tmp_path / "pilot.jsonl"), \
          patch.object(pilot, "invoke", side_effect=AssertionError("unexpected provider call")), \

@@ -30,6 +30,7 @@ def isolated_pilot(tmp_path, monkeypatch):
     monkeypatch.setattr(pilot.subprocess, "run", forbidden)
     monkeypatch.setattr(pilot.subprocess, "Popen", forbidden)
     monkeypatch.delenv("KUBEDOJO_388_PRIMARY_REVIEWER", raising=False)
+    monkeypatch.setenv("LU_PRODUCT_ROOT", str(tmp_path))
     monkeypatch.setattr(pilot, "REPO", tmp_path)
     monkeypatch.setattr(pilot, "PRIMARY_REPO", tmp_path)
     monkeypatch.setattr(pilot, "PILOT_FILE", tmp_path / "scripts/quality/pilot-2026-05-02.txt")

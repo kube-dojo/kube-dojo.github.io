@@ -57,7 +57,7 @@ from lu_machinery.agent_runtime.errors import (
 )
 from lu_machinery.agent_runtime.runner import invoke
 
-from quality.writer_commit import Snapshot, produced, snapshot
+from quality.writer_commit import Snapshot, produced, select_product_root, snapshot
 
 
 def module_slug_for_pipeline(module_path: str) -> str:
@@ -161,17 +161,19 @@ def _queue_from_file(input_file: Path) -> list[tuple[str, int | None]]:
         entries = _parse_yaml_queue(input_file.read_text(encoding="utf-8"))
         loaded: list[tuple[str, int | None]] = []
         for row in entries:
-            path = str(row["path"]).strip()
+            path = str(row["path"])  # validated as given: a padded spelling is not canonical
             budget_value = row.get("budget")
             if budget_value is None:
                 loaded.append((path, None))
                 continue
             loaded.append((path, int(budget_value)))
         return loaded
+    # splitlines() removes only the record delimiter; the rest of the line is
+    # validated as given, so a padded spelling is refused, not trimmed.
     return [
-        (line.strip(), None)
+        (line, None)
         for line in input_file.read_text(encoding="utf-8").splitlines()
-        if line.strip() and not line.startswith("#")
+        if line.strip() and not line.lstrip().startswith("#")
     ]
 
 
@@ -401,7 +403,7 @@ def writer_committed_module(wt: Path, module_path: str, before: Snapshot) -> tup
     own. :func:`quality.writer_commit.produced` decides; ``local_head`` in the
     detail is the commit that was checked, and review must see exactly it.
     """
-    local_head, reason = produced(wt, before, module_path)
+    local_head, reason = produced(wt, before, module_path, kind="file")
     detail: dict[str, str | None] = {"head_before": before.start, "local_head": local_head}
     if reason is not None:
         return False, {**detail, "reason": reason}
@@ -746,6 +748,11 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
 def main(argv: list[str] | None = None) -> int:
     global LOG
     args = parse_args(argv)
+    try:
+        select_product_root(PRIMARY_REPO)
+    except ValueError as exc:
+        print(f"❌ {exc}", file=sys.stderr)
+        return 2
     input_file = args.input or PILOT_FILE
     if args.log is not None:
         LOG = args.log

@@ -25,9 +25,14 @@ failed call refuses with ``git_error``.
 """
 from __future__ import annotations
 
+import os
 import subprocess
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Literal
+
+ArtifactKind = Literal["file", "dir"]
+_REGULAR_MODES = (b"100644", b"100755")
 
 
 @dataclass(frozen=True)
@@ -83,24 +88,31 @@ def snapshot(worktree: Path, ref: str = "HEAD", prior_outputs: tuple[str | None,
     return Snapshot(start, tuple(sorted(tips)))
 
 
-def _content(worktree: Path, commit: str, artifact: str) -> frozenset[tuple[bytes, bytes]] | None:
-    """The artifact's committed content at ``commit``: ``(raw path, blob id)`` pairs.
+def _content(worktree: Path, commit: str, artifact: str, kind: ArtifactKind) -> frozenset[tuple[bytes, bytes, bytes]] | None:
+    """The artifact's committed entries at ``commit``: ``(raw path, type, blob id)`` triples.
 
-    A file artifact yields one pair, a directory one pair per file below it.
-    Paths stay raw bytes (any filename git can store, compared exactly); file
-    modes are ignored, so an executable-bit change is not new content.
-    ``None`` means git failed.
+    ``kind="file"`` lists the exact path only (``ls-tree`` without ``-r``), so
+    a directory or a symlink standing at that path shows as itself.
+    ``kind="dir"`` lists every entry below the directory. The type is
+    ``b"file"`` for a regular file of either mode (an executable-bit change is
+    not new content) and the raw mode for anything else (symlink, submodule,
+    tree). ``None`` means git failed.
     """
-    r = _git(worktree, "ls-tree", "-r", "-z", commit, "--", artifact)
+    args = ["ls-tree", "-z", commit, "--", artifact] if kind == "file" else ["ls-tree", "-r", "-z", commit, "--", artifact]
+    r = _git(worktree, *args)
     if r.returncode != 0:
         return None
-    pairs = set()
+    entries = set()
     for entry in r.stdout.split(b"\0"):
         meta, _, path = entry.partition(b"\t")
         fields = meta.split()
-        if len(fields) == 3 and fields[1] == b"blob":
-            pairs.add((path, fields[2]))
-    return frozenset(pairs)
+        if len(fields) != 3:
+            continue
+        mode, _otype, oid = fields
+        if kind == "file" and path != os.fsencode(artifact):
+            continue
+        entries.add((path, b"file" if mode in _REGULAR_MODES else mode, oid))
+    return frozenset(entries)
 
 
 def _known_commits(worktree: Path, shas: tuple[str, ...]) -> list[str]:
@@ -118,12 +130,17 @@ def _known_commits(worktree: Path, shas: tuple[str, ...]) -> list[str]:
     return known
 
 
-def produced(worktree: Path, before: Snapshot, artifact: str, ref: str = "HEAD") -> tuple[str | None, str | None]:
+def produced(
+    worktree: Path, before: Snapshot, artifact: str, ref: str = "HEAD", *, kind: ArtifactKind,
+) -> tuple[str | None, str | None]:
     """Return ``(checked commit, None)`` when ``ref`` holds new work on ``artifact``.
 
     Otherwise return ``(checked commit or None, reason)`` with reason one of
     ``no_new_commit``, ``not_descendant``, ``no_new_artifact_commit``,
-    ``no_net_change``, ``artifact_missing`` or ``git_error``.
+    ``no_net_change``, ``artifact_missing``, ``artifact_type_mismatch`` or
+    ``git_error``. ``kind`` names what the caller asked for: one regular file
+    at exactly ``artifact``, or a directory whose entries are all regular
+    files.
     """
     final = rev(worktree, ref)
     if before.start is None or final is None or final == before.start:
@@ -141,16 +158,37 @@ def produced(worktree: Path, before: Snapshot, artifact: str, ref: str = "HEAD")
     boundary = _git(worktree, "rev-list", "--boundary", "--stdin", final, stdin=_exclusions(excluded))
     if boundary.returncode != 0:
         return final, "git_error"
-    final_content = _content(worktree, final, artifact)
+    final_content = _content(worktree, final, artifact, kind)
     if final_content is None:
         return final, "git_error"
     if not final_content:
         return final, "artifact_missing"
+    if any(entry_type != b"file" for _path, entry_type, _oid in final_content):
+        return final, "artifact_type_mismatch"
     bases = {before.start} | {line[1:] for line in _ids(boundary.stdout) if line.startswith("-")}
     for base in sorted(bases):
-        base_content = _content(worktree, base, artifact)
+        base_content = _content(worktree, base, artifact, kind)
         if base_content is None:
             return final, "git_error"
         if base_content == final_content:
             return final, "no_net_change"
     return final, None
+
+
+def select_product_root(primary: Path) -> str:
+    """Name the product checkout for the release runtime before a writer runs.
+
+    The installed lu-machinery runtime has no implicit product: write
+    admission refuses unless ``LU_PRODUCT_ROOT`` names one. A direct
+    KubeDojo CLI run selects its primary checkout through that variable,
+    unless the operator already set it, and the selected value gets the
+    release's own check (an absolute path to an existing directory) before
+    any worktree is set up. Returns the selected root; raises ``ValueError``
+    with the reason otherwise.
+    """
+    if not os.environ.get("LU_PRODUCT_ROOT"):
+        os.environ["LU_PRODUCT_ROOT"] = str(primary)
+    value = os.environ["LU_PRODUCT_ROOT"]
+    if "\0" in value or not os.path.isabs(value) or not os.path.isdir(value):
+        raise ValueError(f"LU_PRODUCT_ROOT={value!r} must be an absolute path to an existing directory")
+    return value

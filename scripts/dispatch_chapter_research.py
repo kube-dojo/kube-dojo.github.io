@@ -36,7 +36,7 @@ from textwrap import dedent
 _CHECKOUT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(_CHECKOUT / "scripts"))
 
-from quality.writer_commit import produced, snapshot
+from quality.writer_commit import produced, select_product_root, snapshot
 
 # The primary checkout: dispatch worktrees live under <primary>/.worktrees/.
 REPO = (
@@ -311,7 +311,7 @@ def fire_dispatch(*, worktree: Path, prompt: str, task_id: str,
     # write-mode run produced anything. The prompt's deliverable is a local
     # commit of the chapter's contract directory on the worktree branch; the
     # shared rule decides whether the branch tip holds new work there.
-    _final, reason = produced(worktree, before, artifact_dir, f"refs/heads/{branch}")
+    _final, reason = produced(worktree, before, artifact_dir, f"refs/heads/{branch}", kind="dir")
     if reason is not None:
         print(f"[dispatch] {agent} reported success but {branch} holds no new "
               f"committed work under {artifact_dir} ({reason}); treating as failure")
@@ -334,6 +334,11 @@ def main() -> int:
                    help="Path to a scratch file to stage in the worktree "
                         "root. Repeatable.")
     args = p.parse_args()
+
+    try:
+        select_product_root(REPO)
+    except ValueError as exc:
+        p.error(str(exc))
 
     part_num = detect_part(args.ch_num)
     print(f"[main] Ch{args.ch_num:02d} `{args.slug}` "

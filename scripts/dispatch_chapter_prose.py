@@ -61,7 +61,14 @@ import yaml
 _CHECKOUT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(_CHECKOUT / "scripts"))
 
-from quality.writer_commit import GIT_TIMEOUT_S, Snapshot, produced, rev, snapshot
+from quality.writer_commit import (
+    GIT_TIMEOUT_S,
+    Snapshot,
+    produced,
+    rev,
+    select_product_root,
+    snapshot,
+)
 
 # The primary checkout: dispatch worktrees live under <primary>/.worktrees/.
 REPO = (
@@ -445,7 +452,7 @@ def _prose_committed_since(worktree: Path, prose_path: str, branch: str,
     but then fail their final streaming response (Gemini's 429-on-summary
     pattern, Ch07 2026-04-28).
     """
-    final, reason = produced(worktree, before, prose_path, f"refs/heads/{branch}")
+    final, reason = produced(worktree, before, prose_path, f"refs/heads/{branch}", kind="file")
     if reason is not None:
         print(f"[fire] chapter not delivered on {branch}: {reason}", file=sys.stderr)
         return False
@@ -605,6 +612,10 @@ def main() -> int:
         from lu_machinery.review.model_catalog import retired_model_refusal
         if refusal := retired_model_refusal(override):
             p.error(f"KUBEDOJO_AGY_DRAFT_MODEL={override!r}: {refusal}")
+    try:
+        select_product_root(REPO)
+    except ValueError as exc:
+        p.error(str(exc))
 
     verdicts = ""
     if args.verdict_notes_pr is not None:

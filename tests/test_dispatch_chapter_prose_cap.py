@@ -36,6 +36,7 @@ def isolated(tmp_path, monkeypatch):
         ("lu_machinery.agent_runtime.errors", errors),
     ):
         monkeypatch.setitem(sys.modules, name, module)
+    monkeypatch.setenv("LU_PRODUCT_ROOT", str(tmp_path))
     setup = MagicMock(return_value=(tmp_path, "test-branch"))
     monkeypatch.setattr(prose, "setup_worktree", setup)
     monkeypatch.setattr(prose, "stage_contract_locally", lambda **kwargs: {"brief.md": "test"})
@@ -163,7 +164,7 @@ def _git(cwd, *args):
 @pytest.mark.parametrize(("writer", "success"), [
     ("idle", False), ("uncommitted", False), ("reverted", False), ("rollback", False),
     ("other_branch", False), ("fast_forward_prior", False), ("ff_edit_revert", False),
-    ("mode_only", False), ("committed", True), ("commit_after_prior", True),
+    ("mode_only", False), ("dir_replaces_file", False), ("committed", True), ("commit_after_prior", True),
 ])
 def test_phase_success_without_artifact_change_fails(isolated, monkeypatch, tmp_path, capsys, writer, success):
     """Defect class: a writer reports success but this phase left no new, net,
@@ -172,8 +173,9 @@ def test_phase_success_without_artifact_change_fails(isolated, monkeypatch, tmp_
     behind; a commit followed by its reversal; a reset to an older commit; a
     commit on another branch; or a fast-forward to output that existed before
     the phase, such as an earlier run's branch, also when followed by an edit
-    and its reversal; or a commit that only changes the file mode), so the
-    pipeline must not advance on it. New work on top of earlier output is
+    and its reversal; a commit that only changes the file mode; or a
+    directory committed in place of the chapter file), so the pipeline must
+    not advance on it. New work on top of earlier output is
     still accepted."""
     arguments(monkeypatch, phases="agy")
     path = isolated["path"]
@@ -202,6 +204,12 @@ def test_phase_success_without_artifact_change_fails(isolated, monkeypatch, tmp_
         if writer == "mode_only":
             path.chmod(0o755)
             _git(tmp_path, "commit", "-q", "-am", "mode only")
+        if writer == "dir_replaces_file":
+            path.unlink()
+            path.mkdir()
+            (path / "placeholder.md").write_text("one two", encoding="utf-8")
+            _git(tmp_path, "add", "-A")
+            _git(tmp_path, "commit", "-q", "-m", "directory in place of the chapter")
         if writer == "other_branch":
             _git(tmp_path, "checkout", "-q", "-b", "elsewhere")
         if writer in ("uncommitted", "reverted", "other_branch", "committed", "commit_after_prior"):
