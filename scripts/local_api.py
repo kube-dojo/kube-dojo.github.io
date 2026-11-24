@@ -68,17 +68,27 @@ def _git_path(repo_root: Path, *args: str) -> Path | None:
     return Path(os.fsdecode(out)).resolve()
 
 
+def _main_tree_of(path: Path, common: Path) -> bool:
+    """True when ``path`` is the main working tree of the repository whose common dir is ``common``."""
+    top = _git_path(path, "rev-parse", "--path-format=absolute", "--show-toplevel")
+    git_dir = _git_path(path, "rev-parse", "--path-format=absolute", "--git-dir")
+    return top == path.resolve() and git_dir == common
+
+
 def _primary_checkout(repo_root: Path) -> Path | None:
-    """The main working tree of the repository that holds ``repo_root``.
+    """The main working tree of the repository that holds ``repo_root``, verified through Git.
 
     A checkout is the main working tree exactly when its git directory is the
     repository's common directory; that holds for an ordinary checkout and for
     one whose metadata lives elsewhere (``--separate-git-dir``), and then the
-    answer is its own top level. A linked worktree names the main working tree
-    first in ``git worktree list --porcelain``. The KubeDojo API is a product
-    service and runs on the product interpreter, which does not install
-    lu-machinery, so it asks Git directly. ``None`` when Git cannot answer,
-    which the health check reports as critical.
+    answer is its own top level. For a linked worktree, the first entry of
+    ``git worktree list --porcelain`` is only a candidate: Git names the
+    metadata directory there when the main tree keeps its metadata apart, so
+    the candidate, or else its parent, is accepted only when Git confirms it
+    is the main working tree of the same repository. The KubeDojo API is a
+    product service and runs on the product interpreter, which does not
+    install lu-machinery, so it asks Git directly. ``None`` when Git cannot
+    answer or confirm, which the health check reports as critical.
     """
     top = _git_path(repo_root, "rev-parse", "--path-format=absolute", "--show-toplevel")
     git_dir = _git_path(repo_root, "rev-parse", "--path-format=absolute", "--git-dir")
@@ -97,7 +107,11 @@ def _primary_checkout(repo_root: Path) -> Path | None:
     first = listing.stdout.split(b"\0", 1)[0] if listing.returncode == 0 else b""
     if not first.startswith(b"worktree "):
         return None
-    return Path(os.fsdecode(first[len(b"worktree "):])).resolve()
+    candidate = Path(os.fsdecode(first[len(b"worktree "):])).resolve()
+    for path in (candidate, candidate.parent):
+        if _main_tree_of(path, common):
+            return path
+    return None
 
 
 def _inspect_repo_root(repo_root: Path) -> dict[str, object]:
@@ -106,7 +120,9 @@ def _inspect_repo_root(repo_root: Path) -> dict[str, object]:
     primary = _primary_checkout(resolved)
     warnings: list[str] = []
     if primary is None:
-        warnings.append(f"repo_root {resolved}: the primary checkout cannot be determined (Git did not answer).")
+        warnings.append(
+            f"repo_root {resolved}: the primary checkout cannot be determined or verified through Git."
+        )
     elif resolved != primary:
         warnings.append(
             f"repo_root {resolved} is not the primary checkout ({primary}); "
