@@ -19,7 +19,7 @@ dev = [
     "ruff>=0.17.4",
 ]
 # .github/workflows/zizmor.yml installs only this group (uv export --only-group zizmor).
-zizmor = ["zizmor==1.25.2"]
+zizmor = ["zizmor==1.32.0"]
 
 [tool.uv]
 # Scripts and tests run from the checkout; there is nothing to build or install.
