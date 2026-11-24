@@ -53,7 +53,7 @@ When adding a `.github/workflows/*.yml` or `.github/actions/*/action.yml`:
 2. `permissions:` block is present and starts from `contents: read` minimum.
 3. Privileged scopes are job-level, not workflow-level.
 4. `actions/checkout` has `persist-credentials: false` unless the workflow pushes commits.
-5. Run `uv run --locked --only-group zizmor zizmor --offline --strict-collection .github/` locally — must be clean. It uses the zizmor version pinned with hashes in `uv.lock`, the same one CI runs. `--strict-collection` is required; without it, an unparseable workflow silently passes.
+5. Run `uvx zizmor --offline --strict-collection .github/` locally — must be clean. `--strict-collection` is required; without it, an unparseable workflow silently passes.
 6. CI's `zizmor` workflow (which scans `.github/` with `--strict-collection`) will re-run on the PR and block on findings.
 
 ## References

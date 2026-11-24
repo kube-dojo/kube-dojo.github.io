@@ -43,19 +43,26 @@ jobs:
       - name: Set up uv
         uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7  # v10.2.0
         with:
-          # pyproject.toml [tool.uv] required-version. The SHA-256 of the
-          # x86_64 Linux archive makes an unverifiable download fail instead of
-          # being installed unchecked (setup-uv skips versions it has no
-          # checksum for). Change both together.
+          # The SHA-256 of the x86_64 Linux archive makes an unverifiable
+          # download fail instead of being installed unchecked (setup-uv skips
+          # versions it has no checksum for). Change both together, in every
+          # workflow that sets up uv.
           version: "0.13.9"
           checksum: "a7fbaff2b9a271d85c1bdb540941090fd1ce011797b4abeb48e4dcd39c2471d5"
           enable-cache: false
 
       - name: Install zizmor
-        # The zizmor dependency group in pyproject.toml; uv.lock pins it with hashes.
+        # The zizmor dependency group in pyproject.toml, exported from uv.lock and
+        # installed with --require-hashes (uv sync would trust index metadata for
+        # a lock entry without a digest).
         env:
           UV_PYTHON_DOWNLOADS: never
-        run: uv sync --locked --no-build --only-group zizmor --python "$(cat .python-version)"
+        run: |
+          uv export --locked --only-group zizmor --no-emit-project --format requirements.txt \
+            --output-file "$RUNNER_TEMP/zizmor-requirements.txt"
+          uv venv --python "$(cat .python-version)" .venv
+          uv pip sync --python .venv/bin/python --require-hashes --no-build \
+            "$RUNNER_TEMP/zizmor-requirements.txt"
 
       - name: Run zizmor
         env:

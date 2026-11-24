@@ -18,13 +18,15 @@ dev = [
     "pytest>=9.1.1",
     "ruff>=0.17.4",
 ]
-# .github/workflows/zizmor.yml installs only this group (uv sync --only-group zizmor).
+# .github/workflows/zizmor.yml installs only this group (uv export --only-group zizmor).
 zizmor = ["zizmor==1.25.2"]
 
 [tool.uv]
 # Scripts and tests run from the checkout; there is nothing to build or install.
+# No required-version: Dependabot's uv updater runs its own bundled uv. CI pins
+# uv itself (version and archive checksum in the workflows) and installs from
+# `uv export --locked` with `uv pip sync --require-hashes`, so every artifact in
+# uv.lock must carry a hash.
 package = false
-# One uv release writes and reads uv.lock; workflows install this version.
-required-version = "==0.13.9"
 # Resolve only releases at least 7 days old (same window as Dependabot cooldown).
 exclude-newer = "7 days"
