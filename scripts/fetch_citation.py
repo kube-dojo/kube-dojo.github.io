@@ -126,10 +126,53 @@ def _html_to_text(body: str) -> str:
 
 
 _ALLOWLIST_CACHE: dict[str, Any] | None = None
+_HOST_ENTRY_RE = re.compile(
+    r"^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]*[a-z0-9])?)+$"
+)
 
 
-def _normalize_host(raw_host: str) -> str:
-    return raw_host.strip().lower().removeprefix("www.")
+class _UniqueKeySafeLoader(yaml.SafeLoader):
+    """Safe YAML loader that rejects duplicate mapping keys fail-closed."""
+
+
+def _construct_unique_mapping(
+    loader: _UniqueKeySafeLoader,
+    node: yaml.MappingNode,
+    deep: bool = False,
+) -> dict[Any, Any]:
+    mapping: dict[Any, Any] = {}
+    for key_node, value_node in node.value:
+        key = loader.construct_object(key_node, deep=deep)
+        if key in mapping:
+            raise ValueError(f"Duplicate YAML key in citation allowlist: {key!r}")
+        mapping[key] = loader.construct_object(value_node, deep=deep)
+    return mapping
+
+
+_UniqueKeySafeLoader.add_constructor(
+    yaml.resolver.BaseResolver.DEFAULT_MAPPING_TAG,
+    _construct_unique_mapping,
+)
+
+
+def _normalize_url_host(raw_host: str) -> str | None:
+    """Normalize a parsed URL hostname without trimming whitespace (fail-closed)."""
+    if not raw_host or any(ch.isspace() for ch in raw_host):
+        return None
+    host = raw_host.lower().removeprefix("www.")
+    return host or None
+
+
+def _validate_config_host(raw_host: str, *, kind: str) -> str:
+    if not isinstance(raw_host, str) or raw_host != raw_host.strip():
+        raise ValueError(f"Invalid {kind} entry: {raw_host!r}")
+    lowered = raw_host.lower()
+    if not _HOST_ENTRY_RE.fullmatch(lowered):
+        raise ValueError(f"Invalid {kind} entry: {raw_host!r}")
+    norm = lowered.removeprefix("www.")
+    if not _HOST_ENTRY_RE.fullmatch(norm):
+        raise ValueError(f"Invalid {kind} entry: {raw_host!r}")
+    return norm
 
 
 def _host_matches(host: str, domain: str) -> bool:
@@ -146,10 +189,11 @@ def _normalize_path(raw_path: str) -> str:
     return posixpath.normpath(collapsed).lower()
 
 
-def _parse_excluded(raw_excluded: Any) -> tuple[tuple[str, ...], tuple[tuple[str, str], ...]]:
+def _parse_excluded(allow: dict[str, Any]) -> tuple[tuple[str, ...], tuple[tuple[str, str], ...]]:
     """Validate and normalize the optional ``excluded`` allowlist section fail-closed."""
-    if raw_excluded is None:
+    if "excluded" not in allow:
         return (), ()
+    raw_excluded = allow["excluded"]
     if not isinstance(raw_excluded, dict):
         raise TypeError("Citation allowlist `excluded` section must be a mapping")
     unknown_keys = set(raw_excluded) - {"hosts", "path_prefixes"}
@@ -158,35 +202,32 @@ def _parse_excluded(raw_excluded: Any) -> tuple[tuple[str, ...], tuple[tuple[str
             f"Citation allowlist `excluded` has unsupported keys: {sorted(unknown_keys)}"
         )
 
-    raw_hosts = raw_excluded.get("hosts")
     hosts: list[str] = []
-    if raw_hosts is not None:
+    if "hosts" in raw_excluded:
+        raw_hosts = raw_excluded["hosts"]
         if not isinstance(raw_hosts, list):
             raise TypeError("Citation allowlist `excluded.hosts` must be a list")
-        for item in raw_hosts:
-            if not isinstance(item, str) or any(ch in item for ch in ("/", ":", " ", "\t", "\n")):
-                raise ValueError(f"Invalid excluded host entry: {item!r}")
-            norm_host = _normalize_host(item)
-            if not norm_host:
-                raise ValueError(f"Invalid excluded host entry: {item!r}")
-            hosts.append(norm_host)
+        hosts = [_validate_config_host(item, kind="excluded host") for item in raw_hosts]
 
-    raw_prefixes = raw_excluded.get("path_prefixes")
     prefixes: list[tuple[str, str]] = []
-    if raw_prefixes is not None:
+    if "path_prefixes" in raw_excluded:
+        raw_prefixes = raw_excluded["path_prefixes"]
         if not isinstance(raw_prefixes, list):
             raise TypeError("Citation allowlist `excluded.path_prefixes` must be a list")
         for item in raw_prefixes:
-            if not isinstance(item, str) or "/" not in item:
+            if not isinstance(item, str) or item != item.strip() or "/" not in item:
                 raise ValueError(f"Invalid excluded path_prefix entry: {item!r}")
             host_part, path_part = item.split("/", 1)
-            if any(ch in host_part for ch in (":", " ", "\t", "\n")) or any(
-                ch in path_part for ch in ("?", "#")
+            norm_host = _validate_config_host(host_part, kind="excluded path_prefix")
+            if (
+                not path_part
+                or path_part.startswith("/")
+                or any(ch.isspace() or ord(ch) < 32 or ch in "?#:\\;%" for ch in path_part)
+                or any(seg in {".", ".."} for seg in path_part.split("/"))
             ):
                 raise ValueError(f"Invalid excluded path_prefix entry: {item!r}")
-            norm_host = _normalize_host(host_part)
             norm_prefix = _normalize_path("/" + path_part)
-            if not norm_host or norm_prefix == "/":
+            if norm_prefix == "/":
                 raise ValueError(f"Invalid excluded path_prefix entry: {item!r}")
             prefixes.append((norm_host, norm_prefix))
 
@@ -194,7 +235,7 @@ def _parse_excluded(raw_excluded: Any) -> tuple[tuple[str, ...], tuple[tuple[str
 
 
 def _is_excluded(host: str, norm_path: str, allow: dict[str, Any]) -> bool:
-    excluded_hosts, excluded_prefixes = _parse_excluded(allow.get("excluded"))
+    excluded_hosts, excluded_prefixes = _parse_excluded(allow)
     if any(_host_matches(host, d) for d in excluded_hosts):
         return True
     for excl_host, excl_prefix in excluded_prefixes:
@@ -215,10 +256,14 @@ def _load_allowlist() -> dict[str, Any]:
             f"Citation allowlist not found at {ALLOWLIST_PATH}. The pipeline "
             "will reject every URL as off_allowlist without it."
         )
-    loaded = yaml.safe_load(ALLOWLIST_PATH.read_text(encoding="utf-8"))
-    allow = loaded if isinstance(loaded, dict) else {"tiers": {}, "claim_class_priority": {}}
-    _parse_excluded(allow.get("excluded"))
-    _ALLOWLIST_CACHE = allow
+    loaded = yaml.load(
+        ALLOWLIST_PATH.read_text(encoding="utf-8"),
+        Loader=_UniqueKeySafeLoader,
+    )
+    if not isinstance(loaded, dict):
+        raise TypeError("Citation allowlist root must be a YAML mapping")
+    _parse_excluded(loaded)
+    _ALLOWLIST_CACHE = loaded
     return _ALLOWLIST_CACHE
 
 
@@ -229,8 +274,8 @@ def allowlist_tier(url: str) -> str | None:
         raw_host = parsed.hostname or ""
     except ValueError:
         return None
-    host = _normalize_host(raw_host)
-    if not host:
+    host = _normalize_url_host(raw_host)
+    if host is None:
         return None
     norm_path = _normalize_path(parsed.path)
     allow = _load_allowlist()
@@ -336,6 +381,10 @@ def fetch(url: str, *, refresh: bool = False, timeout: int = DEFAULT_TIMEOUT) ->
     if not refresh:
         cached = _load_cached(url)
         if cached is not None:
+            final_url = cached.get("final_url")
+            cached["allowlist_tier"] = allowlist_tier(
+                final_url if isinstance(final_url, str) and final_url else url
+            )
             return cached
 
     meta, body = _fetch_once(url, timeout=timeout)
