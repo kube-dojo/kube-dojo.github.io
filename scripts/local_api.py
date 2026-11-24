@@ -54,22 +54,50 @@ def _ui_fragments_module() -> Any:
     return _load_ui_fragments_module()
 
 
-def _primary_checkout(repo_root: Path) -> Path | None:
-    """The primary checkout that owns ``repo_root``, from Git's common directory.
-
-    The KubeDojo API is a product service and runs on the product interpreter,
-    which does not install lu-machinery, so it asks Git directly. ``None`` when
-    Git cannot answer, which the health check reports as critical.
-    """
+def _git_path(repo_root: Path, *args: str) -> Path | None:
+    """One absolute path printed by ``git -C repo_root <args>``, or ``None``."""
     try:
         result = subprocess.run(
-            ["git", "-C", str(repo_root), "rev-parse", "--path-format=absolute", "--git-common-dir"],
-            check=False, capture_output=True, text=True, errors="replace", timeout=5,
+            ["git", "-C", str(repo_root), *args], check=False, capture_output=True, timeout=5,
         )
     except (OSError, subprocess.TimeoutExpired):
         return None
-    common = result.stdout.strip() if result.returncode == 0 else ""
-    return Path(common).parent.resolve() if common else None
+    out = result.stdout[:-1] if result.stdout.endswith(b"\n") else result.stdout
+    if result.returncode != 0 or not out:
+        return None
+    return Path(os.fsdecode(out)).resolve()
+
+
+def _primary_checkout(repo_root: Path) -> Path | None:
+    """The main working tree of the repository that holds ``repo_root``.
+
+    A checkout is the main working tree exactly when its git directory is the
+    repository's common directory; that holds for an ordinary checkout and for
+    one whose metadata lives elsewhere (``--separate-git-dir``), and then the
+    answer is its own top level. A linked worktree names the main working tree
+    first in ``git worktree list --porcelain``. The KubeDojo API is a product
+    service and runs on the product interpreter, which does not install
+    lu-machinery, so it asks Git directly. ``None`` when Git cannot answer,
+    which the health check reports as critical.
+    """
+    top = _git_path(repo_root, "rev-parse", "--path-format=absolute", "--show-toplevel")
+    git_dir = _git_path(repo_root, "rev-parse", "--path-format=absolute", "--git-dir")
+    common = _git_path(repo_root, "rev-parse", "--path-format=absolute", "--git-common-dir")
+    if top is None or git_dir is None or common is None:
+        return None
+    if git_dir == common:
+        return top
+    try:
+        listing = subprocess.run(
+            ["git", "-C", str(repo_root), "worktree", "list", "--porcelain", "-z"],
+            check=False, capture_output=True, timeout=5,
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        return None
+    first = listing.stdout.split(b"\0", 1)[0] if listing.returncode == 0 else b""
+    if not first.startswith(b"worktree "):
+        return None
+    return Path(os.fsdecode(first[len(b"worktree "):])).resolve()
 
 
 def _inspect_repo_root(repo_root: Path) -> dict[str, object]:
@@ -78,7 +106,7 @@ def _inspect_repo_root(repo_root: Path) -> dict[str, object]:
     primary = _primary_checkout(resolved)
     warnings: list[str] = []
     if primary is None:
-        warnings.append(f"repo_root {resolved}: the primary checkout cannot be determined (git rev-parse failed).")
+        warnings.append(f"repo_root {resolved}: the primary checkout cannot be determined (Git did not answer).")
     elif resolved != primary:
         warnings.append(
             f"repo_root {resolved} is not the primary checkout ({primary}); "
