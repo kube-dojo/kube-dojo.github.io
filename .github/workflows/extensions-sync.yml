@@ -54,7 +54,10 @@ jobs:
           curl --fail --silent --show-error --location --proto '=https' --proto-redir '=https' \
             --output "$wheelhouse/$wheel" \
             "https://github.com/learn-ukrainian/machinery/releases/download/v${version}/$wheel"
-          uv pip install --python .venv/bin/python --require-hashes --no-build \
+          # --no-config: the consumer lock is compiled by the machinery release, so
+          # pyproject.toml [tool.uv] settings (its 7-day exclude-newer) must not
+          # filter it.
+          uv pip install --no-config --python .venv/bin/python --require-hashes --no-build \
             --find-links "$wheelhouse" -r requirements-machinery.lock
 
       - name: Apply and verify the deployment
