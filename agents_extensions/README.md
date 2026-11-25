@@ -7,7 +7,7 @@ KubeDojo sources in `shared/`, `claude/`, and `codex/`.
 ## Apply and verify
 
 Use a virtual environment containing the hash-locked machinery release. See
-the [machinery consumer installation procedure](https://github.com/learn-ukrainian/machinery/blob/v0.1.43/docs/release.md#consumers).
+the [machinery consumer installation procedure](https://github.com/agentic-machinery/machinery/blob/v0.1.43/docs/release.md#consumers).
 Set `LEARN_UKRAINIAN_PRIMARY_REPO_ROOT` to your configured machinery
 shared-state checkout. Set `LEARN_UKRAINIAN_PYTHON` to the absolute executable
 in the virtual environment where you installed the locked release.
