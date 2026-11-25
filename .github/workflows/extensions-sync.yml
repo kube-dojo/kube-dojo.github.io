@@ -53,7 +53,7 @@ jobs:
           wheel="lu_machinery-${version}-py3-none-any.whl"
           curl --fail --silent --show-error --location --proto '=https' --proto-redir '=https' \
             --output "$wheelhouse/$wheel" \
-            "https://github.com/learn-ukrainian/machinery/releases/download/v${version}/$wheel"
+            "https://github.com/agentic-machinery/machinery/releases/download/v${version}/$wheel"
           # --no-config: the consumer lock is compiled by the machinery release, so
           # pyproject.toml [tool.uv] settings (its 7-day exclude-newer) must not
           # filter it.

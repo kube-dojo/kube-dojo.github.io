@@ -18,7 +18,7 @@ permissions: {}
 jobs:
   fleet-security:
     name: Fleet security
-    uses: learn-ukrainian/machinery/.github/workflows/fleet-security.yml@12f0ce5664024b1680ec9ffbfa1a2c6a4b078705
+    uses: agentic-machinery/machinery/.github/workflows/fleet-security.yml@12f0ce5664024b1680ec9ffbfa1a2c6a4b078705
     permissions:
       contents: read
     with:
