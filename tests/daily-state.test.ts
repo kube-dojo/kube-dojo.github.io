@@ -404,5 +404,16 @@ describe('Daily Dojo player DOM workflow', () => {
     const partialHint = root2.querySelector('.dd-feedback-hint')?.textContent ?? '';
     expect(partialHint).not.toContain('tomorrow');
     expect(root2.querySelector('[data-unit-result]')).toBeNull();
+
+    // When storage write fails, neither the result box nor the wrong-option hint claims persistence (F5).
+    const readOnlyStore = memoryStorage(null, { failWrite: true });
+    const root3 = createShell();
+    mountDailyPlayer(root3, { pack: CKA_MODULE_5_1_PACK, storage: readOnlyStore.storage, now: () => currentDay });
+    root3.querySelector<HTMLButtonElement>('[data-check-option][data-correct="true"]')!.click();
+    expect(root3.querySelector('.dd-result-text')?.textContent).toContain('this visit only');
+    expect(root3.querySelector('.dd-result-text')?.textContent).not.toContain('Saved locally');
+    root3.querySelector<HTMLButtonElement>('[data-check-option][data-correct="false"]')!.click();
+    expect(root3.querySelector('.dd-feedback-hint')?.textContent).toContain('this visit only');
+    expect(root3.querySelector('.dd-feedback-hint')?.textContent).not.toContain('stays saved');
   });
 });

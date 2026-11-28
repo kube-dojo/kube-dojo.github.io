@@ -312,7 +312,7 @@ export const CKA_MODULE_5_1_UNITS: readonly DailyUnit[] = [
     estimatedMinutes: 4,
     reviewMinutes: 2,
     idea:
-      'Once describe confirms a container started and exited, inspect its logs carefully. When restartCount is greater than zero, the live container may have just booted, hiding the crash line—add --previous to read the terminated instance. In multi-container Pods, bare kubectl logs fails unless a default-container annotation is set, so list container names first and pass -c to target the failing container.',
+      'Once describe confirms a container started and exited, inspect its logs carefully. When restartCount is greater than zero, the live container may have just booted, hiding the crash line—add --previous to read the terminated instance. In multi-container Pods, bare kubectl logs uses the default-container annotation or the first container (printing a "Defaulted container" notice), which may be a healthy sidecar—list container names first and pass -c.',
     workedExample: {
       title: 'Targeting the crashed container in a multi-container Pod',
       language: 'bash',
@@ -328,7 +328,7 @@ export const CKA_MODULE_5_1_UNITS: readonly DailyUnit[] = [
       {
         id: 'logs-q1',
         prompt:
-          'A Pod has containers app and metrics-sidecar. Running kubectl logs <pod> fails asking for a container name, and describe shows app restarted four times. What should you run next?',
+          'A Pod lists containers metrics-sidecar then app. Running kubectl logs <pod> prints "Defaulted container metrics-sidecar" and healthy output, while describe shows app restarted four times. What should you run next?',
         options: [
           {
             id: 'a',

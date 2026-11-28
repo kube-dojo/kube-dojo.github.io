@@ -475,12 +475,17 @@ export function mountDailyPlayer(
           );
           feedback.appendChild(document.createTextNode(chosen.explanation));
           if (!chosen.correct) {
+            const persisted = storageBlockedReason === null;
             let hintText =
-              'Select another option to compare explanations, then answer any remaining checks to save this session.';
+              'Select another option to compare explanations, then answer any remaining checks to record this session.';
             if (session.recorded && session.recordedOutcome === 'missed' && session.nextReviewAt) {
-              hintText = `Select another option to compare explanations. This unit is scheduled for review tomorrow (${session.nextReviewAt}).`;
+              hintText = persisted
+                ? `Select another option to compare explanations. This unit is scheduled for review tomorrow (${session.nextReviewAt}).`
+                : 'Select another option to compare explanations. Recorded for this visit only (storage unavailable).';
             } else if (session.recorded && session.nextReviewAt) {
-              hintText = `Select another option to compare explanations. Your recorded result stays saved (next review: ${session.nextReviewAt}).`;
+              hintText = persisted
+                ? `Select another option to compare explanations. Your recorded result stays saved (next review: ${session.nextReviewAt}).`
+                : 'Select another option to compare explanations. Your result is recorded for this visit only (storage unavailable).';
             }
             const hint = el('p', 'dd-feedback-hint', hintText);
             feedback.appendChild(hint);
@@ -503,10 +508,14 @@ export function mountDailyPlayer(
       resultBox.setAttribute('role', 'status');
       resultBox.setAttribute('aria-live', 'polite');
 
-      const summaryText =
-        session.recordedOutcome === 'correct'
+      const persisted = storageBlockedReason === null;
+      const summaryText = persisted
+        ? session.recordedOutcome === 'correct'
           ? `Unit complete! Saved locally — next review due ${session.nextReviewAt}.`
-          : `Saved locally — because a check was missed, this unit is due tomorrow (${session.nextReviewAt}) for a quick refresher.`;
+          : `Saved locally — because a check was missed, this unit is due tomorrow (${session.nextReviewAt}) for a quick refresher.`
+        : session.recordedOutcome === 'correct'
+          ? 'Unit complete! Recorded for this visit only (browser storage unavailable).'
+          : 'Recorded for this visit only (browser storage unavailable) — review this unit again tomorrow.';
       resultBox.appendChild(el('p', 'dd-result-text', summaryText));
 
       const nextTarget =
