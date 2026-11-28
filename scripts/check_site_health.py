@@ -22,10 +22,10 @@ import re
 import sys
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Optional
 
 REPO_ROOT = Path(__file__).parent.parent
 DOCS_DIR = REPO_ROOT / "src" / "content" / "docs"
+PAGES_DIR = REPO_ROOT / "src" / "pages"
 CONFIG_FILE = REPO_ROOT / "astro.config.mjs"
 ABSOLUTE_INTERNAL_LINK_RE = re.compile(r'\]\((/[A-Za-z0-9\-_/\.]+/?)\)')
 
@@ -34,9 +34,9 @@ ABSOLUTE_INTERNAL_LINK_RE = re.compile(r'\]\((/[A-Za-z0-9\-_/\.]+/?)\)')
 class _Results:
     errors: list[str] = field(default_factory=list)
     warnings: list[str] = field(default_factory=list)
-    total_files: Optional[int] = None
-    module_count: Optional[int] = None
-    links_checked: Optional[int] = None
+    total_files: int | None = None
+    module_count: int | None = None
+    links_checked: int | None = None
 
 
 _results = _Results()
@@ -74,8 +74,28 @@ def _read_frontmatter(content: str) -> str | None:
     return parts[1] if len(parts) >= 3 else None
 
 
+def _iter_static_page_paths() -> list[str]:
+    """Return normalized site paths for static Astro pages under src/pages/."""
+    if not PAGES_DIR.is_dir():
+        return []
+    paths: list[str] = []
+    for page in sorted(PAGES_DIR.rglob("*.astro")):
+        rel = page.relative_to(PAGES_DIR)
+        if any("[" in part for part in rel.parts):
+            continue
+        stem_path = str(rel.with_suffix("")).replace("\\", "/")
+        if stem_path == "index":
+            slug = ""
+        elif stem_path.endswith("/index"):
+            slug = stem_path.removesuffix("/index")
+        else:
+            slug = stem_path
+        paths.append(_normalize_site_path(slug))
+    return paths
+
+
 def get_all_slugs() -> set:
-    """Build a set of all known slugs/paths from content files."""
+    """Build a set of all known slugs/paths from content files and static pages."""
     slugs = set()
     for md in _iter_markdown_files():
         rel = md.relative_to(DOCS_DIR)
@@ -94,6 +114,12 @@ def get_all_slugs() -> set:
 
         slugs.add(slug.rstrip("/"))
         slugs.add(slug.rstrip("/") + "/")
+
+    for page_path in _iter_static_page_paths():
+        trimmed = page_path.strip("/")
+        if trimmed:
+            slugs.add(trimmed)
+            slugs.add(trimmed + "/")
 
     return slugs
 
@@ -116,7 +142,7 @@ def _path_derived_slug(md: Path) -> str:
 
 
 def _static_absolute_link_targets() -> set[str]:
-    """Build valid absolute targets from content slugs and redirect sources."""
+    """Build valid absolute targets from content slugs, static pages, and redirect sources."""
     targets: set[str] = set()
 
     for md in _iter_markdown_files():
@@ -124,6 +150,9 @@ def _static_absolute_link_targets() -> set[str]:
         slug_match = re.search(r'^slug:\s*(.+)$', fm, re.MULTILINE)
         slug = slug_match.group(1) if slug_match else _path_derived_slug(md)
         targets.add(_normalize_site_path(slug))
+
+    for page_path in _iter_static_page_paths():
+        targets.add(page_path)
 
     if CONFIG_FILE.exists():
         config = CONFIG_FILE.read_text(errors="replace")

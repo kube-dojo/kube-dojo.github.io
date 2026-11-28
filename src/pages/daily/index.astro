@@ -1,0 +1,137 @@
+---
+import DailyDojoLayout from '../../layouts/DailyDojo.astro';
+import {
+  CKA_MODULE_5_1_PACK,
+  DAILY_FEATURE_NAME,
+} from '../../data/daily/cka-module-5.1';
+
+const pack = CKA_MODULE_5_1_PACK;
+const firstUnit = pack.units[0];
+const pageTitle = `${DAILY_FEATURE_NAME} — ${pack.title} | KubeDojo`;
+const pageDescription =
+  'Practice CKA Kubernetes troubleshooting in 3–5 minute daily lessons with active checks and spaced review. Progress stays only in your browser; zero analytics.';
+---
+
+<DailyDojoLayout title={pageTitle} description={pageDescription}>
+  <section class="dd-hero">
+    <div class="dd-hero-inner">
+      <span class="dd-kicker">{DAILY_FEATURE_NAME} · Pilot</span>
+      <h1>{pack.title}</h1>
+      <p class="dd-hero-sub">{pack.subtitle}</p>
+      <p class="dd-privacy-note">
+        Browser-only progress in <code>localStorage</code> — no account, no cookies, no analytics. Clearing site data resets local progress.
+      </p>
+    </div>
+  </section>
+
+  <main class="dd-main" data-daily-root>
+    <div class="dd-stats" data-daily-stats aria-label="Daily progress summary">
+      <div class="dd-stat" data-stat="completed">
+        <span class="dd-stat-value">0 / {pack.units.length}</span>
+        <span class="dd-stat-label">Completed</span>
+      </div>
+      <div class="dd-stat" data-stat="streak">
+        <span class="dd-stat-value">0 days</span>
+        <span class="dd-stat-label">Streak</span>
+      </div>
+      <div class="dd-stat" data-stat="due">
+        <span class="dd-stat-value">0</span>
+        <span class="dd-stat-label">Due today</span>
+      </div>
+      <div class="dd-stat" data-stat="best">
+        <span class="dd-stat-value">0 days</span>
+        <span class="dd-stat-label">Best streak</span>
+      </div>
+    </div>
+
+    <div data-daily-notice hidden></div>
+
+    <section data-daily-plan aria-label="Today's study plan">
+      <div class="dd-plan-card" data-plan-mode="new">
+        <h2 class="dd-plan-title">Today's 3–5 minute lesson</h2>
+        <p class="dd-plan-desc">
+          Up next: Unit {firstUnit.number} — {firstUnit.title} (~{firstUnit.estimatedMinutes} min).
+        </p>
+      </div>
+    </section>
+
+    <div class="dd-workspace">
+      <nav data-daily-nav aria-label="Pilot units">
+        <ol class="dd-unit-list">
+          {pack.units.map((unit, idx) => (
+            <li>
+              <button
+                type="button"
+                class:list={['dd-unit-pill', { 'is-active': idx === 0 }]}
+                data-unit-select={unit.id}
+                aria-current={idx === 0 ? 'step' : undefined}
+              >
+                <span class="dd-pill-num">{unit.number}</span>
+                <span class="dd-pill-title">{unit.title}</span>
+                <span class="dd-pill-badge">New</span>
+              </button>
+            </li>
+          ))}
+        </ol>
+      </nav>
+
+      <section data-daily-unit aria-label="Active daily unit">
+        <article class="dd-lesson" data-unit-id={firstUnit.id}>
+          <header class="dd-lesson-header">
+            <div class="dd-lesson-meta">
+              <span class="dd-tag dd-tag-num">Unit {firstUnit.number} of {pack.units.length}</span>
+              <span class="dd-tag dd-tag-time">~{firstUnit.estimatedMinutes} min</span>
+            </div>
+            <h2 class="dd-lesson-title">{firstUnit.title}</h2>
+          </header>
+          <section class="dd-section">
+            <h3 class="dd-section-label">Core idea</h3>
+            <p class="dd-idea">{firstUnit.idea}</p>
+          </section>
+          <section class="dd-section dd-example">
+            <h3 class="dd-section-label">Worked example: {firstUnit.workedExample.title}</h3>
+            <pre class="dd-code"><code>{firstUnit.workedExample.code}</code></pre>
+            <p class="dd-takeaway">{firstUnit.workedExample.takeaway}</p>
+          </section>
+          <footer class="dd-lesson-footer" data-unit-links>
+            <div class="dd-deep-links">
+              <a
+                class="dd-link-card"
+                data-parent-link
+                href={`${pack.parentModulePath}#${firstUnit.parentAnchor}`}
+              >
+                <span class="dd-link-kicker">Full module section</span>
+                <span class="dd-link-main">{firstUnit.parentSectionTitle} &rarr;</span>
+              </a>
+              <a
+                class="dd-link-card"
+                data-lab-link
+                href={firstUnit.labUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                <span class="dd-link-kicker">Hands-on Killercoda lab</span>
+                <span class="dd-link-main">Launch {firstUnit.labId} &#8599;</span>
+              </a>
+            </div>
+            <div class="dd-sources">
+              <span class="dd-sources-label">Official documentation: </span>
+              {firstUnit.sources.map((src, index) => (
+                <>
+                  {index > 0 && ' · '}
+                  <a class="dd-source-link" href={src.url} target="_blank" rel="noopener noreferrer">
+                    {src.title}
+                  </a>
+                </>
+              ))}
+            </div>
+          </footer>
+        </article>
+      </section>
+    </div>
+  </main>
+
+  <script>
+    import '../../scripts/daily-player';
+  </script>
+</DailyDojoLayout>

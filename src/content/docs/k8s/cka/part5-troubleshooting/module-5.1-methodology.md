@@ -19,6 +19,8 @@ lab:
 >
 > **Prerequisites**: Parts 1-4 completed, including cluster architecture, workloads, networking, storage, and basic kubectl fluency
 
+**Short on time?** Practice this module in 3–5 minute bite-size lessons with [Daily Dojo](/daily/) (10 units, browser-only progress, no analytics).
+
 ---
 
 ## Learning Outcomes
