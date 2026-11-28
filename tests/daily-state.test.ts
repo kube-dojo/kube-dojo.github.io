@@ -300,8 +300,10 @@ describe('Daily Dojo pilot content and zero-analytics invariants (AC-01, AC-03, 
       expect(unit.labUrl).toBe(PARENT_LAB_URL);
       expect(unit.sources.length).toBeGreaterThanOrEqual(1);
       for (const src of unit.sources) {
-        expect(src.url).toMatch(/^https:\/\/kubernetes\.io\/docs\//);
-        expect(src.url).not.toMatch(/v1-\d+\.docs\.kubernetes\.io/);
+        const parsed = new URL(src.url);
+        expect(parsed.protocol).toBe('https:');
+        expect(parsed.hostname).toBe('kubernetes.io');
+        expect(parsed.pathname.startsWith('/docs/')).toBe(true);
       }
 
       // Parent section title must exist as a heading in module-5.1-methodology.md
@@ -386,5 +388,21 @@ describe('Daily Dojo player DOM workflow', () => {
 
     reviewDueBtn!.click();
     expect(root2.querySelector('[data-unit-id]')?.getAttribute('data-unit-id')).toBe(CKA_MODULE_5_1_UNITS[0].id);
+
+    // Complete due review of Unit 1 correctly (+3 days -> 2026-12-02), then click a distractor to compare explanations:
+    // hint must reflect the saved 2026-12-02 date rather than falsely claiming tomorrow (F2).
+    root2.querySelector<HTMLButtonElement>('[data-check-option][data-correct="true"]')!.click();
+    expect(root2.querySelector('[data-unit-result]')?.getAttribute('data-unit-result')).toBe('correct');
+    root2.querySelector<HTMLButtonElement>('[data-check-option][data-correct="false"]')!.click();
+    const postReviewHint = root2.querySelector('.dd-feedback-hint')?.textContent ?? '';
+    expect(postReviewHint).toContain('2026-12-02');
+    expect(postReviewHint).not.toContain('tomorrow');
+
+    // On a two-check unit (Unit 8), answering only check 1 wrong must not claim the unit is already scheduled for tomorrow (F2).
+    root2.querySelector<HTMLButtonElement>('[data-unit-select="service-endpoints-before-dns"]')!.click();
+    root2.querySelector<HTMLButtonElement>('[data-check-option="svc-q1:a"]')!.click();
+    const partialHint = root2.querySelector('.dd-feedback-hint')?.textContent ?? '';
+    expect(partialHint).not.toContain('tomorrow');
+    expect(root2.querySelector('[data-unit-result]')).toBeNull();
   });
 });

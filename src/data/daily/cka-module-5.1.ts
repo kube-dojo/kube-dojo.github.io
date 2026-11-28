@@ -312,7 +312,7 @@ export const CKA_MODULE_5_1_UNITS: readonly DailyUnit[] = [
     estimatedMinutes: 4,
     reviewMinutes: 2,
     idea:
-      'Once describe confirms a container started and exited, inspect its logs carefully. When restartCount is greater than zero, the live container may have just booted, hiding the crash line—add --previous to read the terminated instance. In multi-container Pods, list container names first and pass -c so you do not read a healthy sidecar by mistake.',
+      'Once describe confirms a container started and exited, inspect its logs carefully. When restartCount is greater than zero, the live container may have just booted, hiding the crash line—add --previous to read the terminated instance. In multi-container Pods, bare kubectl logs fails unless a default-container annotation is set, so list container names first and pass -c to target the failing container.',
     workedExample: {
       title: 'Targeting the crashed container in a multi-container Pod',
       language: 'bash',
@@ -328,7 +328,7 @@ export const CKA_MODULE_5_1_UNITS: readonly DailyUnit[] = [
       {
         id: 'logs-q1',
         prompt:
-          'A Pod with containers app and metrics-sidecar has restarted four times, but kubectl logs <pod> shows healthy sidecar output. What should you run next?',
+          'A Pod has containers app and metrics-sidecar. Running kubectl logs <pod> fails asking for a container name, and describe shows app restarted four times. What should you run next?',
         options: [
           {
             id: 'a',
@@ -436,7 +436,7 @@ export const CKA_MODULE_5_1_UNITS: readonly DailyUnit[] = [
     estimatedMinutes: 4,
     reviewMinutes: 2,
     idea:
-      'Pod phase Running only means the Pod is bound to a node and at least one container has been created or started. It does not guarantee the Pod receives Service traffic. If the readiness probe fails, Kubernetes keeps the container running while marking Ready=False and excluding the Pod IP from ready EndpointSlices.',
+      'Pod phase Running only means the Pod is bound to a node, all containers are created, and at least one container is running, starting, or restarting. It does not guarantee the Pod receives Service traffic. If the readiness probe fails, Kubernetes keeps the container running while marking Ready=False and excluding the Pod IP from ready EndpointSlices.',
     workedExample: {
       title: 'Checking readiness probe failures on a Running Pod',
       language: 'bash',

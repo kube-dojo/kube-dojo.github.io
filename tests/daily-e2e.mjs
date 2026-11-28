@@ -21,7 +21,7 @@
 
 import assert from 'node:assert/strict';
 import { spawn, spawnSync } from 'node:child_process';
-import { existsSync, mkdtempSync, readFileSync, rmSync, statSync } from 'node:fs';
+import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import http from 'node:http';
 import os from 'node:os';
 import path from 'node:path';
@@ -67,7 +67,6 @@ const MIME_TYPES = {
 
 function findChromeBinary() {
   if (process.env.CHROME_BIN) {
-    assert(existsSync(process.env.CHROME_BIN), `CHROME_BIN does not exist: ${process.env.CHROME_BIN}`);
     return process.env.CHROME_BIN;
   }
   for (const candidate of ['google-chrome', 'chromium', 'chromium-browser']) {
@@ -77,24 +76,41 @@ function findChromeBinary() {
   throw new Error('No Chrome/Chromium binary found (set CHROME_BIN to override).');
 }
 
+function readStaticFile(rootDir, urlPath) {
+  const resolvedRoot = path.resolve(rootDir);
+  const decoded = decodeURIComponent(urlPath);
+  const safeRel = path.normalize(decoded).replace(/^(\.\.(\/|\\|$))+/, '').replace(/^[/\\]+/, '');
+  const candidate = path.resolve(resolvedRoot, safeRel);
+  if (candidate !== resolvedRoot && !candidate.startsWith(`${resolvedRoot}${path.sep}`)) {
+    return null;
+  }
+  const tryPaths = candidate === resolvedRoot ? [path.join(resolvedRoot, 'index.html')] : [candidate, path.join(candidate, 'index.html')];
+  for (const target of tryPaths) {
+    try {
+      return { filePath: target, body: readFileSync(target) };
+    } catch (err) {
+      if (err && (err.code === 'ENOENT' || err.code === 'EISDIR' || err.code === 'ENOTDIR')) {
+        continue;
+      }
+      throw err;
+    }
+  }
+  return null;
+}
+
 function startStaticServer(rootDir) {
   return new Promise((resolve, reject) => {
     const server = http.createServer((req, res) => {
       const urlPath = new URL(req.url ?? '/', 'http://127.0.0.1').pathname;
-      const decoded = decodeURIComponent(urlPath);
-      const safePath = path.normalize(decoded).replace(/^(\.\.(\/|\\|$))+/, '');
-      let filePath = path.join(rootDir, safePath);
-      if (existsSync(filePath) && statSync(filePath).isDirectory()) {
-        filePath = path.join(filePath, 'index.html');
-      }
-      if (!filePath.startsWith(rootDir) || !existsSync(filePath) || statSync(filePath).isDirectory()) {
+      const file = readStaticFile(rootDir, urlPath);
+      if (!file) {
         res.writeHead(404, { 'content-type': 'text/plain; charset=utf-8' });
         res.end('Not found');
         return;
       }
-      const ext = path.extname(filePath).toLowerCase();
+      const ext = path.extname(file.filePath).toLowerCase();
       res.writeHead(200, { 'content-type': MIME_TYPES[ext] ?? 'application/octet-stream' });
-      res.end(readFileSync(filePath));
+      res.end(file.body);
     });
     server.on('error', reject);
     server.listen(0, '127.0.0.1', () => {
@@ -209,14 +225,21 @@ async function main() {
   const startTime = Date.now();
 
   // 1. Static built HTML assertions (AC-01 + parent anchor check)
-  assert(existsSync(dailyHtmlPath), `Missing built Daily Dojo page: ${dailyHtmlPath} (run npm run build first)`);
-  assert(existsSync(parentHtmlPath), `Missing built parent module page: ${parentHtmlPath}`);
-
-  const dailyHtml = readFileSync(dailyHtmlPath, 'utf8');
+  let dailyHtml;
+  try {
+    dailyHtml = readFileSync(dailyHtmlPath, 'utf8');
+  } catch (err) {
+    throw new Error(`Missing built Daily Dojo page: ${dailyHtmlPath} (run npm run build first)`, { cause: err });
+  }
   assert(!/count\.js/i.test(dailyHtml), 'Built dist/daily/index.html must NOT reference count.js');
   assert(!/goatcounter/i.test(dailyHtml), 'Built dist/daily/index.html must NOT reference goatcounter');
 
-  const parentHtml = readFileSync(parentHtmlPath, 'utf8');
+  let parentHtml;
+  try {
+    parentHtml = readFileSync(parentHtmlPath, 'utf8');
+  } catch (err) {
+    throw new Error(`Missing built parent module page: ${parentHtmlPath}`, { cause: err });
+  }
   for (const anchor of EXPECTED_ANCHORS) {
     assert(
       parentHtml.includes(`id="${anchor}"`),

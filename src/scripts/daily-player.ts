@@ -475,11 +475,14 @@ export function mountDailyPlayer(
           );
           feedback.appendChild(document.createTextNode(chosen.explanation));
           if (!chosen.correct) {
-            const hint = el(
-              'p',
-              'dd-feedback-hint',
-              'Select another option to compare explanations. This unit is scheduled for review tomorrow.',
-            );
+            let hintText =
+              'Select another option to compare explanations, then answer any remaining checks to save this session.';
+            if (session.recorded && session.recordedOutcome === 'missed' && session.nextReviewAt) {
+              hintText = `Select another option to compare explanations. This unit is scheduled for review tomorrow (${session.nextReviewAt}).`;
+            } else if (session.recorded && session.nextReviewAt) {
+              hintText = `Select another option to compare explanations. Your recorded result stays saved (next review: ${session.nextReviewAt}).`;
+            }
+            const hint = el('p', 'dd-feedback-hint', hintText);
             feedback.appendChild(hint);
           }
           fieldset.appendChild(feedback);
